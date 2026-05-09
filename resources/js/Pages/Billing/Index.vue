@@ -1,6 +1,6 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, router } from '@inertiajs/vue3';
+import { Head, router, usePage } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
 const props = defineProps({
@@ -57,7 +57,10 @@ function upgrade(plan) {
                     subscription_id:     data.subscription_id,
                 });
             },
-            prefill: { name: '', email: '' },
+            prefill: {
+                name:    usePage().props.auth.user.name  ?? '',
+                email:   usePage().props.auth.user.email ?? '',
+            },
             theme: { color: '#4f46e5' },
             modal: { ondismiss: () => { payingPlanId.value = null; } },
         };
