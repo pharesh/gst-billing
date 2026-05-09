@@ -15,7 +15,7 @@ class User extends Authenticatable
 
     protected $fillable = [
         'tenant_id', 'name', 'email', 'password', 'role',
-        'otp_code', 'otp_expires_at', 'otp_verified',
+        'otp_code', 'otp_expires_at', 'otp_verified', 'is_super_admin',
     ];
 
     protected $hidden = [
@@ -57,5 +57,10 @@ class User extends Authenticatable
     public function isOwner(): bool
     {
         return $this->role === 'owner';
+    }
+
+    public function isSuperAdmin(): bool
+    {
+        return (bool) $this->is_super_admin;
     }
 }

@@ -17,7 +17,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'tenant' => \App\Http\Middleware\EnsureTenantLinked::class,
+            'tenant'      => \App\Http\Middleware\EnsureTenantLinked::class,
+            'superadmin'  => \App\Http\Middleware\EnsureSuperAdmin::class,
+            'plan.limit'  => \App\Http\Middleware\CheckPlanLimits::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
