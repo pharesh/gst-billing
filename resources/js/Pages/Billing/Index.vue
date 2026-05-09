@@ -14,6 +14,7 @@ const props = defineProps({
 
 const payingPlanId = ref(null);
 const payError = ref('');
+let _upgradeInProgress = false;
 
 function usagePct(used, limit) {
     if (limit === -1) return 0;
@@ -22,6 +23,8 @@ function usagePct(used, limit) {
 
 function upgrade(plan) {
     if (plan.price_monthly === 0) return;
+    if (_upgradeInProgress) return;
+    _upgradeInProgress = true;
     payingPlanId.value = plan.id;
     payError.value = '';
 
@@ -35,11 +38,13 @@ function upgrade(plan) {
         if (data.error) {
             payError.value = data.error;
             payingPlanId.value = null;
+            _upgradeInProgress = false;
             return;
         }
         if (!window.Razorpay) {
             payError.value = 'Payment gateway script not loaded. Please refresh the page.';
             payingPlanId.value = null;
+            _upgradeInProgress = false;
             return;
         }
         const options = {
@@ -62,14 +67,20 @@ function upgrade(plan) {
                 email:   usePage().props.auth.user.email ?? '',
             },
             theme: { color: '#4f46e5' },
-            modal: { ondismiss: () => { payingPlanId.value = null; } },
+            modal: {
+                ondismiss: () => {
+                    payingPlanId.value = null;
+                    _upgradeInProgress = false;
+                },
+            },
         };
         const rzp = new window.Razorpay(options);
         rzp.open();
     })
-    .catch(err => {
+    .catch(() => {
         payError.value = 'Something went wrong. Please try again.';
         payingPlanId.value = null;
+        _upgradeInProgress = false;
     });
 }
 

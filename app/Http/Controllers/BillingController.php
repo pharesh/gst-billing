@@ -48,6 +48,26 @@ class BillingController extends Controller
 
         $tenant = $request->user()->tenant;
 
+        // Reuse existing pending subscription to prevent duplicates on double-click
+        $existing = $tenant->subscriptions()
+            ->where('plan_id', $plan->id)
+            ->where('status', 'trial')
+            ->whereNotNull('razorpay_order_id')
+            ->whereNull('razorpay_payment_id')
+            ->where('created_at', '>=', now()->subMinutes(30))
+            ->latest()
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'order_id'        => $existing->razorpay_order_id,
+                'amount'          => (int) ($plan->price_monthly * 100),
+                'currency'        => 'INR',
+                'plan_name'       => $plan->name,
+                'subscription_id' => $existing->id,
+            ]);
+        }
+
         try {
             $api = new \Razorpay\Api\Api($key, $secret);
 
@@ -108,6 +128,14 @@ class BillingController extends Controller
             'razorpay_payment_id' => $request->razorpay_payment_id,
             'amount_paid'         => $plan->price_monthly,
         ]);
+
+        // Remove any other duplicate pending subscriptions for this plan
+        $tenant->subscriptions()
+            ->where('plan_id', $plan->id)
+            ->where('status', 'trial')
+            ->where('id', '!=', $subscription->id)
+            ->whereNull('razorpay_payment_id')
+            ->delete();
 
         $tenant->update(['plan_id' => $plan->id]);
 
