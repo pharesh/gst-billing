@@ -29,19 +29,28 @@ class InvoiceController extends Controller
 
         $invoices = Invoice::with('customer')
             ->where('tenant_id', $tenant->id)
-            ->when($request->search, fn ($q) => $q->where('invoice_number', 'like', "%{$request->search}%"))
-            ->when($request->status, fn ($q) => $q->where('payment_status', $request->status))
+            ->when($request->search, fn ($q) => $q->where('invoice_number', 'like', "%{$request->search}%")
+                ->orWhereHas('customer', fn ($c) => $c->where('name', 'like', "%{$request->search}%")))
+            ->when($request->status,      fn ($q) => $q->where('payment_status', $request->status))
+            ->when($request->customer_id, fn ($q) => $q->where('customer_id', $request->customer_id))
+            ->when($request->date_from,   fn ($q) => $q->whereDate('invoice_date', '>=', $request->date_from))
+            ->when($request->date_to,     fn ($q) => $q->whereDate('invoice_date', '<=', $request->date_to))
             ->latest('invoice_date')
             ->paginate(20)
             ->withQueryString();
 
+        $base = Invoice::where('tenant_id', $tenant->id);
+
         return Inertia::render('Invoices/Index', [
-            'invoices' => $invoices,
-            'filters' => $request->only(['search', 'status']),
-            'summary' => [
-                'total' => Invoice::where('tenant_id', $tenant->id)->sum('total_amount'),
-                'paid' => Invoice::where('tenant_id', $tenant->id)->where('payment_status', 'paid')->sum('total_amount'),
-                'unpaid' => Invoice::where('tenant_id', $tenant->id)->whereIn('payment_status', ['unpaid', 'partial'])->sum('total_amount'),
+            'invoices'  => $invoices,
+            'customers' => Customer::where('tenant_id', $tenant->id)->orderBy('name')->get(['id', 'name']),
+            'filters'   => $request->only(['search', 'status', 'customer_id', 'date_from', 'date_to']),
+            'summary'   => [
+                'total'   => (clone $base)->sum('total_amount'),
+                'paid'    => (clone $base)->where('payment_status', 'paid')->sum('total_amount'),
+                'unpaid'  => (clone $base)->whereIn('payment_status', ['unpaid', 'partial'])->sum('total_amount'),
+                'overdue' => (clone $base)->whereIn('payment_status', ['unpaid', 'partial'])
+                                ->whereNotNull('due_date')->whereDate('due_date', '<', today())->count(),
             ],
         ]);
     }

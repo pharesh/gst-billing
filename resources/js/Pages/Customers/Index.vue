@@ -1,6 +1,6 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
-import { Head, useForm, router } from '@inertiajs/vue3';
+import { Head, Link, useForm, router } from '@inertiajs/vue3';
 import { ref } from 'vue';
 
 const props = defineProps({
@@ -165,6 +165,7 @@ function applySearch() {
                                 <td class="px-4 py-3 text-gray-500">{{ c.phone || '—' }}</td>
                                 <td class="px-4 py-3">
                                     <div class="flex gap-2">
+                                        <Link :href="route('customers.statement', c.id)" class="text-gray-600 hover:underline text-xs">Statement</Link>
                                         <button @click="openEdit(c)" class="text-indigo-600 hover:underline text-xs">Edit</button>
                                         <button @click="deleteCustomer(c.id)" class="text-red-500 hover:underline text-xs">Delete</button>
                                     </div>

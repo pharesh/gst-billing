@@ -86,6 +86,9 @@ function fmt(n) {
                     <a :href="route('invoices.download', invoice.id)" class="px-3 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50">
                         Download PDF
                     </a>
+                    <Link :href="route('credit-notes.create', { invoice_id: invoice.id })" class="px-3 py-2 border border-amber-400 text-amber-700 rounded-lg text-sm hover:bg-amber-50">
+                        Credit Note
+                    </Link>
                     <button @click="showPaymentForm = !showPaymentForm" v-if="invoice.payment_status !== 'paid'" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700">
                         Record Payment
                     </button>

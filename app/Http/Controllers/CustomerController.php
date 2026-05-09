@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use App\Models\Invoice;
+use App\Models\Payment;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -63,6 +65,30 @@ class CustomerController extends Controller
         $customer->update($validated);
 
         return back()->with('success', 'Customer updated.');
+    }
+
+    public function statement(Request $request, Customer $customer)
+    {
+        abort_unless($customer->tenant_id === $request->user()->tenant_id, 403);
+
+        $invoices = Invoice::with('payments')
+            ->where('customer_id', $customer->id)
+            ->orderBy('invoice_date')
+            ->get();
+
+        $totalBilled   = $invoices->sum('total_amount');
+        $totalPaid     = $invoices->sum('amount_paid');
+        $totalBalance  = $totalBilled - $totalPaid;
+
+        return Inertia::render('Customers/Statement', [
+            'customer'     => $customer,
+            'invoices'     => $invoices,
+            'summary'      => [
+                'total_billed'  => $totalBilled,
+                'total_paid'    => $totalPaid,
+                'total_balance' => $totalBalance,
+            ],
+        ]);
     }
 
     public function destroy(Request $request, Customer $customer)

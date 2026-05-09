@@ -126,6 +126,19 @@ class Tenant extends Model
         return $this->activeSubscription?->isActive() ?? false;
     }
 
+    public function nextCreditNoteNumber(): string
+    {
+        $prefix = $this->invoice_prefix . '-CN';
+        $last = \App\Models\CreditNote::where('tenant_id', $this->id)
+            ->where('credit_note_number', 'like', $prefix . '-%')
+            ->orderByRaw('CAST(SUBSTRING_INDEX(credit_note_number, "-", -1) AS UNSIGNED) DESC')
+            ->value('credit_note_number');
+
+        $count = $last ? ((int) substr(strrchr($last, '-'), 1)) + 1 : 1;
+
+        return $prefix . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+    }
+
     public function nextInvoiceNumber(): string
     {
         $last = Invoice::where('tenant_id', $this->id)

@@ -4,7 +4,10 @@ use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminPlanController;
 use App\Http\Controllers\Admin\AdminTenantController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\CreditNoteController;
 use App\Http\Controllers\CustomerController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\RecurringInvoiceController;
 use Illuminate\Http\Request;
 use App\Http\Controllers\GSTReportController;
 use App\Http\Controllers\InvoiceController;
@@ -22,20 +25,7 @@ Route::get('/', function () {
 });
 
 Route::middleware(['auth', 'verified', 'tenant'])->group(function () {
-    Route::get('/dashboard', function (Request $request) {
-        $tenant = $request->user()->tenant;
-        $tenantId = $tenant?->id;
-
-        return Inertia::render('Dashboard', [
-            'stats' => [
-                'monthly_total' => \App\Models\Invoice::where('tenant_id', $tenantId)->whereMonth('invoice_date', now()->month)->sum('total_amount'),
-                'monthly_paid' => \App\Models\Invoice::where('tenant_id', $tenantId)->whereMonth('invoice_date', now()->month)->where('payment_status', 'paid')->sum('total_amount'),
-                'total_outstanding' => \App\Models\Invoice::where('tenant_id', $tenantId)->whereIn('payment_status', ['unpaid', 'partial'])->selectRaw('SUM(total_amount - amount_paid)')->value('SUM(total_amount - amount_paid)'),
-                'invoice_count' => \App\Models\Invoice::where('tenant_id', $tenantId)->count(),
-            ],
-            'recentInvoices' => \App\Models\Invoice::with('customer')->where('tenant_id', $tenantId)->latest()->limit(5)->get(),
-        ]);
-    })->name('dashboard');
+    Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
@@ -56,6 +46,7 @@ Route::middleware(['auth', 'verified', 'tenant'])->group(function () {
     // Customers
     Route::resource('customers', CustomerController::class)->except(['create', 'show', 'edit', 'store']);
     Route::post('/customers', [CustomerController::class, 'store'])->middleware('plan.limit:customer')->name('customers.store');
+    Route::get('/customers/{customer}/statement', [CustomerController::class, 'statement'])->name('customers.statement');
 
     // Products
     Route::resource('products', ProductController::class)->except(['create', 'show', 'edit', 'store']);
@@ -70,6 +61,13 @@ Route::middleware(['auth', 'verified', 'tenant'])->group(function () {
     Route::get('/reports/gstr1', [GSTReportController::class, 'gstr1'])->name('reports.gstr1');
     Route::get('/reports/gstr3b', [GSTReportController::class, 'gstr3b'])->name('reports.gstr3b');
     Route::get('/reports/gstr1/download', [GSTReportController::class, 'downloadGSTR1'])->name('reports.gstr1.download');
+
+    // Credit Notes
+    Route::resource('credit-notes', CreditNoteController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
+
+    // Recurring Invoices
+    Route::resource('recurring-invoices', RecurringInvoiceController::class)->only(['index', 'create', 'store', 'destroy']);
+    Route::post('/recurring-invoices/{recurringInvoice}/toggle', [RecurringInvoiceController::class, 'toggle'])->name('recurring-invoices.toggle');
 
     // Billing & Subscription
     Route::get('/billing', [BillingController::class, 'index'])->name('billing.index');
