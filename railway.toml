@@ -1,8 +1,8 @@
 ﻿[build]
-builder = "nixpacks"
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "bash scripts/deploy.sh"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 

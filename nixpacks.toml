@@ -1,4 +1,1 @@
-﻿# Let Nixpacks auto-detect PHP (with Composer) and Node.js from project files.
-# Only override the start command.
-[start]
-cmd = "bash scripts/deploy.sh"
+﻿# Using Dockerfile build instead (see railway.toml + Dockerfile)
