@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Plan;
 use App\Models\Tenant;
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Inertia\Inertia;
 
 class AdminTenantController extends Controller
@@ -26,6 +29,50 @@ class AdminTenantController extends Controller
             'plans'   => Plan::orderBy('sort_order')->get(['id', 'name', 'slug']),
             'filters' => $request->only(['search', 'plan']),
         ]);
+    }
+
+    public function store(Request $request)
+    {
+        $request->validate([
+            'company_name'   => 'required|string|max:255',
+            'owner_name'     => 'required|string|max:255',
+            'email'          => 'required|email|unique:users,email',
+            'password'       => 'required|string|min:8',
+            'gstin'          => ['nullable', 'string', 'size:15'],
+            'state'          => 'nullable|string|max:100',
+            'invoice_prefix' => 'nullable|string|max:10',
+            'plan_id'        => 'nullable|exists:plans,id',
+        ]);
+
+        DB::transaction(function () use ($request) {
+            $tenant = Tenant::create([
+                'name'             => $request->company_name,
+                'gstin'            => $request->gstin ? strtoupper($request->gstin) : null,
+                'state'            => $request->state,
+                'invoice_prefix'   => strtoupper($request->invoice_prefix ?? 'INV'),
+                'subscription_plan'=> 'free',
+                'plan_id'          => $request->plan_id,
+            ]);
+
+            User::create([
+                'tenant_id' => $tenant->id,
+                'name'      => $request->owner_name,
+                'email'     => $request->email,
+                'password'  => Hash::make($request->password),
+                'role'      => 'owner',
+            ]);
+
+            if ($request->plan_id) {
+                $tenant->subscriptions()->create([
+                    'plan_id'   => $request->plan_id,
+                    'status'    => 'active',
+                    'starts_at' => now(),
+                    'ends_at'   => now()->addMonth(),
+                ]);
+            }
+        });
+
+        return redirect()->route('admin.tenants.index')->with('success', "Tenant '{$request->company_name}' created successfully.");
     }
 
     public function show(Tenant $tenant)

@@ -83,6 +83,7 @@ Route::middleware(['auth', 'superadmin'])->prefix('admin')->name('admin.')->grou
 
     // Tenants
     Route::get('/tenants', [AdminTenantController::class, 'index'])->name('tenants.index');
+    Route::post('/tenants', [AdminTenantController::class, 'store'])->name('tenants.store');
     Route::get('/tenants/{tenant}', [AdminTenantController::class, 'show'])->name('tenants.show');
     Route::post('/tenants/{tenant}/assign-plan', [AdminTenantController::class, 'assignPlan'])->name('tenants.assign-plan');
     Route::post('/tenants/{tenant}/toggle-suspend', [AdminTenantController::class, 'toggleSuspend'])->name('tenants.toggle-suspend');

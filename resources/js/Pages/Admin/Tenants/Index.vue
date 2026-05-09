@@ -5,9 +5,21 @@ import { ref } from 'vue';
 const props = defineProps({ tenants: Object, plans: Array, filters: Object });
 
 const search = ref(props.filters.search ?? '');
+const showCreate = ref(false);
+
+const createForm = useForm({
+    company_name: '', owner_name: '', email: '', password: '',
+    gstin: '', state: '', invoice_prefix: 'INV', plan_id: '',
+});
 
 function doSearch() {
     router.get(route('admin.tenants.index'), { search: search.value }, { preserveState: true });
+}
+
+function submitCreate() {
+    createForm.post(route('admin.tenants.store'), {
+        onSuccess: () => { showCreate.value = false; createForm.reset(); },
+    });
 }
 
 function toggleSuspend(tenant) {
@@ -44,8 +56,85 @@ function date(d) { return d ? new Date(d).toLocaleDateString('en-IN') : '-'; }
         <div class="p-6 max-w-7xl mx-auto space-y-4">
             <div class="flex items-center justify-between">
                 <h2 class="text-xl font-semibold text-gray-800">All Tenants ({{ tenants.total }})</h2>
-                <input v-model="search" @keyup.enter="doSearch" type="text" placeholder="Search name or email..."
-                       class="border border-gray-300 rounded-lg px-3 py-2 text-sm w-64" />
+                <div class="flex gap-3">
+                    <input v-model="search" @keyup.enter="doSearch" type="text" placeholder="Search name or email..."
+                           class="border border-gray-300 rounded-lg px-3 py-2 text-sm w-64" />
+                    <button @click="showCreate = true"
+                            class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">
+                        + New Tenant
+                    </button>
+                </div>
+            </div>
+
+            <!-- Create Tenant Modal -->
+            <div v-if="showCreate" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+                    <h3 class="font-bold text-gray-800 text-lg mb-4">Create New Tenant</h3>
+                    <form @submit.prevent="submitCreate" class="space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Business Name *</label>
+                                <input v-model="createForm.company_name" type="text" required placeholder="ABC Pvt Ltd"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                                <p v-if="createForm.errors.company_name" class="text-red-500 text-xs mt-1">{{ createForm.errors.company_name }}</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Owner Name *</label>
+                                <input v-model="createForm.owner_name" type="text" required placeholder="Rajesh Shah"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Email *</label>
+                                <input v-model="createForm.email" type="email" required placeholder="owner@business.com"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                                <p v-if="createForm.errors.email" class="text-red-500 text-xs mt-1">{{ createForm.errors.email }}</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Password *</label>
+                                <input v-model="createForm.password" type="password" required placeholder="Min 8 chars"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">GSTIN</label>
+                                <input v-model="createForm.gstin" type="text" placeholder="22AAAAA0000A1Z5"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">State</label>
+                                <input v-model="createForm.state" type="text" placeholder="Gujarat"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Invoice Prefix</label>
+                                <input v-model="createForm.invoice_prefix" type="text" placeholder="INV"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Assign Plan</label>
+                                <select v-model="createForm.plan_id" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                                    <option value="">Free (default)</option>
+                                    <option v-for="p in plans" :key="p.id" :value="p.id">{{ p.name }}</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex gap-3 pt-2">
+                            <button type="submit" :disabled="createForm.processing"
+                                    class="flex-1 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                                {{ createForm.processing ? 'Creating...' : 'Create Tenant' }}
+                            </button>
+                            <button type="button" @click="showCreate = false; createForm.reset()"
+                                    class="flex-1 py-2 border border-gray-300 text-sm text-gray-600 rounded-lg hover:bg-gray-50">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
 
             <!-- Flash -->
