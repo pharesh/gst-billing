@@ -15,7 +15,7 @@ class AdminTenantController extends Controller
 {
     public function index(Request $request)
     {
-        $tenants = Tenant::with(['plan', 'activeSubscription.plan'])
+        $tenants = Tenant::with(['plan', 'activeSubscription.plan', 'users'])
             ->withCount(['invoices', 'customers', 'users'])
             ->when($request->search, fn ($q) => $q->where('name', 'like', "%{$request->search}%")
                 ->orWhere('email', 'like', "%{$request->search}%"))
@@ -108,6 +108,41 @@ class AdminTenantController extends Controller
         ]);
 
         return back()->with('success', "Plan changed to {$plan->name}.");
+    }
+
+    public function update(Request $request, Tenant $tenant)
+    {
+        $ownerUser = $tenant->users()->where('role', 'owner')->first();
+
+        $request->validate([
+            'company_name'   => 'required|string|max:255',
+            'owner_name'     => 'required|string|max:255',
+            'email'          => 'required|email|unique:users,email,' . ($ownerUser?->id ?? 0),
+            'gstin'          => ['nullable', 'string', 'size:15'],
+            'state'          => 'nullable|string|max:100',
+            'invoice_prefix' => 'nullable|string|max:10',
+            'new_password'   => 'nullable|string|min:8',
+        ]);
+
+        $tenant->update([
+            'name'           => $request->company_name,
+            'gstin'          => $request->gstin ? strtoupper($request->gstin) : null,
+            'state'          => $request->state,
+            'invoice_prefix' => strtoupper($request->invoice_prefix ?? 'INV'),
+        ]);
+
+        if ($ownerUser) {
+            $ownerData = [
+                'name'  => $request->owner_name,
+                'email' => $request->email,
+            ];
+            if ($request->filled('new_password')) {
+                $ownerData['password'] = Hash::make($request->new_password);
+            }
+            $ownerUser->update($ownerData);
+        }
+
+        return back()->with('success', "Tenant '{$tenant->name}' updated successfully.");
     }
 
     public function toggleSuspend(Tenant $tenant)

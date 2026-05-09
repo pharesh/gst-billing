@@ -6,10 +6,16 @@ const props = defineProps({ tenants: Object, plans: Array, filters: Object });
 
 const search = ref(props.filters.search ?? '');
 const showCreate = ref(false);
+const editingTenant = ref(null);
 
 const createForm = useForm({
     company_name: '', owner_name: '', email: '', password: '',
     gstin: '', state: '', invoice_prefix: 'INV', plan_id: '',
+});
+
+const editForm = useForm({
+    company_name: '', owner_name: '', email: '',
+    gstin: '', state: '', invoice_prefix: '', new_password: '',
 });
 
 function doSearch() {
@@ -19,6 +25,24 @@ function doSearch() {
 function submitCreate() {
     createForm.post(route('admin.tenants.store'), {
         onSuccess: () => { showCreate.value = false; createForm.reset(); },
+    });
+}
+
+function openEdit(tenant) {
+    editingTenant.value = tenant;
+    const owner = tenant.users?.[0];
+    editForm.company_name  = tenant.name;
+    editForm.owner_name    = owner?.name ?? '';
+    editForm.email         = owner?.email ?? '';
+    editForm.gstin         = tenant.gstin ?? '';
+    editForm.state         = tenant.state ?? '';
+    editForm.invoice_prefix = tenant.invoice_prefix ?? 'INV';
+    editForm.new_password  = '';
+}
+
+function submitEdit() {
+    editForm.patch(route('admin.tenants.update', editingTenant.value.id), {
+        onSuccess: () => { editingTenant.value = null; editForm.reset(); },
     });
 }
 
@@ -137,6 +161,69 @@ function date(d) { return d ? new Date(d).toLocaleDateString('en-IN') : '-'; }
                 </div>
             </div>
 
+            <!-- Edit Tenant Modal -->
+            <div v-if="editingTenant" class="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                <div class="bg-white rounded-xl shadow-xl w-full max-w-lg p-6">
+                    <h3 class="font-bold text-gray-800 text-lg mb-1">Edit Tenant</h3>
+                    <p class="text-xs text-gray-400 mb-4">ID #{{ editingTenant.id }}</p>
+                    <form @submit.prevent="submitEdit" class="space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Business Name *</label>
+                                <input v-model="editForm.company_name" type="text" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                                <p v-if="editForm.errors.company_name" class="text-red-500 text-xs mt-1">{{ editForm.errors.company_name }}</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Owner Name *</label>
+                                <input v-model="editForm.owner_name" type="text" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">Owner Email *</label>
+                                <input v-model="editForm.email" type="email" required
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                                <p v-if="editForm.errors.email" class="text-red-500 text-xs mt-1">{{ editForm.errors.email }}</p>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">New Password <span class="text-gray-400">(leave blank to keep)</span></label>
+                                <input v-model="editForm.new_password" type="password" placeholder="Leave blank to keep"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">GSTIN</label>
+                                <input v-model="editForm.gstin" type="text" placeholder="22AAAAA0000A1Z5"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-gray-600 mb-1">State</label>
+                                <input v-model="editForm.state" type="text" placeholder="Gujarat"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1">Invoice Prefix</label>
+                            <input v-model="editForm.invoice_prefix" type="text" placeholder="INV"
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                        </div>
+                        <div class="flex gap-3 pt-2">
+                            <button type="submit" :disabled="editForm.processing"
+                                    class="flex-1 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                                {{ editForm.processing ? 'Saving...' : 'Save Changes' }}
+                            </button>
+                            <button type="button" @click="editingTenant = null; editForm.reset()"
+                                    class="flex-1 py-2 border border-gray-300 text-sm text-gray-600 rounded-lg hover:bg-gray-50">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
             <!-- Flash -->
             <div v-if="$page.props.flash?.success" class="px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
                 {{ $page.props.flash.success }}
@@ -178,6 +265,7 @@ function date(d) { return d ? new Date(d).toLocaleDateString('en-IN') : '-'; }
                             <td class="px-4 py-3 text-right">
                                 <div class="flex gap-2 justify-end">
                                     <Link :href="route('admin.tenants.show', t.id)" class="text-xs text-indigo-600 hover:underline">View</Link>
+                                    <button @click="openEdit(t)" class="text-xs text-gray-600 hover:underline">Edit</button>
                                     <button @click="toggleSuspend(t)" class="text-xs hover:underline"
                                             :class="t.is_suspended ? 'text-green-600' : 'text-orange-500'">
                                         {{ t.is_suspended ? 'Reactivate' : 'Suspend' }}
