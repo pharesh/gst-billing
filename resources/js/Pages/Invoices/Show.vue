@@ -106,15 +106,23 @@ function fmt(n) {
 
                 <!-- Record Payment Form -->
                 <div v-if="showPaymentForm" class="bg-white rounded-lg shadow p-6">
-                    <h3 class="text-base font-semibold mb-4">Record Payment</h3>
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-base font-semibold">Record Payment</h3>
+                        <span class="text-sm text-gray-500">Balance Due: <span class="font-bold text-red-600">{{ fmt(invoice.balance_due) }}</span></span>
+                    </div>
                     <form @submit.prevent="recordPayment" class="grid grid-cols-3 gap-4">
                         <div>
                             <label class="text-sm font-medium text-gray-700 block mb-1">Amount (₹)</label>
-                            <input v-model.number="paymentForm.amount" type="number" step="0.01" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" required />
+                            <input v-model.number="paymentForm.amount" type="number" step="0.01"
+                                   :max="invoice.balance_due" min="0.01"
+                                   class="w-full border rounded-lg px-3 py-2 text-sm"
+                                   :class="paymentForm.errors.amount ? 'border-red-400 bg-red-50' : 'border-gray-300'" required />
+                            <p v-if="paymentForm.errors.amount" class="text-red-500 text-xs mt-1">{{ paymentForm.errors.amount }}</p>
                         </div>
                         <div>
                             <label class="text-sm font-medium text-gray-700 block mb-1">Date</label>
                             <input v-model="paymentForm.payment_date" type="date" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" required />
+                            <p v-if="paymentForm.errors.payment_date" class="text-red-500 text-xs mt-1">{{ paymentForm.errors.payment_date }}</p>
                         </div>
                         <div>
                             <label class="text-sm font-medium text-gray-700 block mb-1">Method</label>
@@ -131,7 +139,8 @@ function fmt(n) {
                             <input v-model="paymentForm.reference_number" type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
                         </div>
                         <div class="col-span-2 flex items-end gap-2">
-                            <button type="submit" :disabled="paymentForm.processing" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700">Save Payment</button>
+                            <button type="submit" :disabled="paymentForm.processing" class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50">Save Payment</button>
+                            <button type="button" @click="paymentForm.amount = invoice.balance_due" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200">Full Amount</button>
                             <button type="button" @click="showPaymentForm = false" class="px-4 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button>
                         </div>
                     </form>
