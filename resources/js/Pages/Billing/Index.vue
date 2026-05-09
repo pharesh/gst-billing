@@ -27,7 +27,7 @@ function upgrade(plan) {
 
     fetch(route('billing.order'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]').content },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name=csrf-token]')?.content ?? '' },
         body: JSON.stringify({ plan_id: plan.id }),
     })
     .then(r => r.json())
