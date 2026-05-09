@@ -31,45 +31,49 @@ class BillingController extends Controller
 
     public function createOrder(Request $request)
     {
-        $request->validate(['plan_id' => 'required|exists:plans,id']);
+        $validated = $request->validate(['plan_id' => 'required|exists:plans,id']);
 
-        $plan = Plan::findOrFail($request->plan_id);
+        $plan = Plan::findOrFail($validated['plan_id']);
 
         if ($plan->isFree()) {
-            return back()->withErrors(['plan' => 'Cannot purchase free plan.']);
+            return response()->json(['error' => 'Cannot purchase free plan.'], 422);
+        }
+
+        $key    = config('services.razorpay.key');
+        $secret = config('services.razorpay.secret');
+
+        if (blank($key) || str_contains($key, 'YOUR_KEY')) {
+            return response()->json(['error' => 'Payment gateway not configured. Please contact support.'], 503);
         }
 
         $tenant = $request->user()->tenant;
 
-        // Create Razorpay order
-        $api = new \Razorpay\Api\Api(
-            config('services.razorpay.key'),
-            config('services.razorpay.secret')
-        );
+        try {
+            $api = new \Razorpay\Api\Api($key, $secret);
 
-        $order = $api->order->create([
-            'receipt'  => 'sub_' . $tenant->id . '_' . time(),
-            'amount'   => $plan->price_monthly * 100, // paise
-            'currency' => 'INR',
-            'notes'    => [
-                'tenant_id' => $tenant->id,
-                'plan_id'   => $plan->id,
-            ],
-        ]);
+            $order = $api->order->create([
+                'receipt'  => 'sub_' . $tenant->id . '_' . time(),
+                'amount'   => (int) ($plan->price_monthly * 100),
+                'currency' => 'INR',
+                'notes'    => ['tenant_id' => $tenant->id, 'plan_id' => $plan->id],
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Razorpay order creation failed: ' . $e->getMessage());
+            return response()->json(['error' => 'Payment gateway error: ' . $e->getMessage()], 502);
+        }
 
-        // Store pending subscription
         $subscription = $tenant->subscriptions()->create([
-            'plan_id'            => $plan->id,
-            'status'             => 'trial',
-            'razorpay_order_id'  => $order->id,
+            'plan_id'           => $plan->id,
+            'status'            => 'trial',
+            'razorpay_order_id' => $order->id,
         ]);
 
         return response()->json([
-            'order_id'       => $order->id,
-            'amount'         => $plan->price_monthly * 100,
-            'currency'       => 'INR',
-            'plan_name'      => $plan->name,
-            'subscription_id'=> $subscription->id,
+            'order_id'        => $order->id,
+            'amount'          => (int) ($plan->price_monthly * 100),
+            'currency'        => 'INR',
+            'plan_name'       => $plan->name,
+            'subscription_id' => $subscription->id,
         ]);
     }
 

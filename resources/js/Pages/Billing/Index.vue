@@ -12,7 +12,8 @@ const props = defineProps({
     razorpayKey: String,
 });
 
-const paying = ref(false);
+const payingPlanId = ref(null);
+const payError = ref('');
 
 function usagePct(used, limit) {
     if (limit === -1) return 0;
@@ -21,7 +22,8 @@ function usagePct(used, limit) {
 
 function upgrade(plan) {
     if (plan.price_monthly === 0) return;
-    paying.value = true;
+    payingPlanId.value = plan.id;
+    payError.value = '';
 
     fetch(route('billing.order'), {
         method: 'POST',
@@ -30,6 +32,16 @@ function upgrade(plan) {
     })
     .then(r => r.json())
     .then(data => {
+        if (data.error) {
+            payError.value = data.error;
+            payingPlanId.value = null;
+            return;
+        }
+        if (!window.Razorpay) {
+            payError.value = 'Payment gateway script not loaded. Please refresh the page.';
+            payingPlanId.value = null;
+            return;
+        }
         const options = {
             key: props.razorpayKey,
             amount: data.amount,
@@ -47,12 +59,15 @@ function upgrade(plan) {
             },
             prefill: { name: '', email: '' },
             theme: { color: '#4f46e5' },
-            modal: { ondismiss: () => { paying.value = false; } },
+            modal: { ondismiss: () => { payingPlanId.value = null; } },
         };
         const rzp = new window.Razorpay(options);
         rzp.open();
     })
-    .catch(() => { paying.value = false; });
+    .catch(err => {
+        payError.value = 'Something went wrong. Please try again.';
+        payingPlanId.value = null;
+    });
 }
 
 function fmt(n) {
@@ -76,6 +91,10 @@ function fmt(n) {
                 <!-- Flash -->
                 <div v-if="$page.props.flash?.success" class="px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
                     {{ $page.props.flash.success }}
+                </div>
+                <div v-if="payError" class="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex justify-between">
+                    <span>{{ payError }}</span>
+                    <button @click="payError = ''" class="text-red-400 hover:text-red-600 font-bold">✕</button>
                 </div>
 
                 <!-- Current Plan + Usage -->
@@ -162,10 +181,10 @@ function fmt(n) {
                         <button
                             v-else-if="plan.price_monthly > 0"
                             @click="upgrade(plan)"
-                            :disabled="paying"
+                            :disabled="payingPlanId !== null"
                             class="w-full py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
                         >
-                            {{ paying ? 'Processing...' : 'Upgrade to ' + plan.name }}
+                            {{ payingPlanId === plan.id ? 'Processing...' : 'Upgrade to ' + plan.name }}
                         </button>
                         <div v-else class="w-full py-2 text-center text-sm text-gray-400">Basic Plan</div>
                     </div>
