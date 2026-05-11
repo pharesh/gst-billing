@@ -20,7 +20,7 @@ return new class extends Migration
             $table->boolean('gstr_export')->default(false);
             $table->boolean('pdf_download')->default(true);
             $table->boolean('multi_user')->default(false);
-            $table->json('features')->nullable();
+            $table->text('features')->nullable();
             $table->boolean('is_active')->default(true);
             $table->integer('sort_order')->default(0);
             $table->timestamps();
