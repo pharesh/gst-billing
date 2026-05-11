@@ -24,7 +24,7 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->string('terms')->nullable();
             $table->boolean('is_active')->default(true);
-            $table->json('items');
+            $table->text('items');
             $table->timestamps();
 
             $table->index(['tenant_id', 'is_active', 'next_run_date']);
