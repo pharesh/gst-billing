@@ -5,7 +5,6 @@ use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\NewPasswordController;
-use App\Http\Controllers\Auth\OtpController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\RegisteredUserController;
@@ -13,10 +12,6 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
-    Route::get('otp/verify', [OtpController::class, 'show'])->name('otp.verify');
-    Route::post('otp/verify', [OtpController::class, 'verify'])->name('otp.store');
-    Route::post('otp/resend', [OtpController::class, 'resend'])->name('otp.resend');
-
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');
 
