@@ -13,6 +13,7 @@ use App\Http\Controllers\GSTReportController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SettingsController;
 use Illuminate\Support\Facades\Route;
@@ -51,6 +52,10 @@ Route::middleware(['auth', 'verified', 'tenant'])->group(function () {
     // Products
     Route::resource('products', ProductController::class)->except(['create', 'show', 'edit', 'store']);
     Route::post('/products', [ProductController::class, 'store'])->middleware('plan.limit:product')->name('products.store');
+
+    // Suppliers
+    Route::resource('suppliers', SupplierController::class)->except(['create', 'show', 'edit', 'store']);
+    Route::post('/suppliers', [SupplierController::class, 'store'])->name('suppliers.store');
 
     // Payments
     Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');

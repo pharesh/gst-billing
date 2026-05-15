@@ -37,6 +37,7 @@ const showingNavigationDropdown = ref(false);
                                 <NavLink :href="route('invoices.index')" :active="route().current('invoices.*')">Invoices</NavLink>
                                 <NavLink :href="route('customers.index')" :active="route().current('customers.*')">Customers</NavLink>
                                 <NavLink :href="route('products.index')" :active="route().current('products.*')">Products</NavLink>
+                                <NavLink :href="route('suppliers.index')" :active="route().current('suppliers.*')">Suppliers</NavLink>
                                 <NavLink :href="route('reports.index')" :active="route().current('reports.*')">GST Reports</NavLink>
                                 <NavLink :href="route('credit-notes.index')" :active="route().current('credit-notes.*')">Credit Notes</NavLink>
                                 <NavLink :href="route('billing.index')" :active="route().current('billing.*')">Billing</NavLink>
