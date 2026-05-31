@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -33,7 +33,7 @@ class Tenant extends Model
 
     public function activeSubscription(): HasOne
     {
-        return $this->hasOne(Subscription::class)->latestOfMany();
+        return $this->hasOne(Subscription::class)->latest();
     }
 
     public function subscriptions(): HasMany
@@ -134,24 +134,26 @@ class Tenant extends Model
     public function nextCreditNoteNumber(): string
     {
         $prefix = $this->invoice_prefix . '-CN';
-        $last = \App\Models\CreditNote::where('tenant_id', $this->id)
+        $max = \App\Models\CreditNote::where('tenant_id', $this->id)
             ->where('credit_note_number', 'like', $prefix . '-%')
-            ->orderByRaw('CAST(SUBSTRING_INDEX(credit_note_number, "-", -1) AS UNSIGNED) DESC')
-            ->value('credit_note_number');
+            ->pluck('credit_note_number')
+            ->map(fn ($n) => (int) substr(strrchr($n, '-'), 1))
+            ->max();
 
-        $count = $last ? ((int) substr(strrchr($last, '-'), 1)) + 1 : 1;
+        $count = ($max ?? 0) + 1;
 
         return $prefix . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
     }
 
     public function nextInvoiceNumber(): string
     {
-        $last = Invoice::where('tenant_id', $this->id)
+        $max = Invoice::where('tenant_id', $this->id)
             ->where('invoice_number', 'like', $this->invoice_prefix . '-%')
-            ->orderByRaw('CAST(SUBSTRING_INDEX(invoice_number, "-", -1) AS UNSIGNED) DESC')
-            ->value('invoice_number');
+            ->pluck('invoice_number')
+            ->map(fn ($n) => (int) substr(strrchr($n, '-'), 1))
+            ->max();
 
-        $count = $last ? ((int) substr(strrchr($last, '-'), 1)) + 1 : 1;
+        $count = ($max ?? 0) + 1;
 
         return $this->invoice_prefix . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
     }

@@ -2,25 +2,23 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Invoice;
 use App\Models\Customer;
+use App\Models\Invoice;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
     public function index(Request $request)
     {
-        $tenant   = $request->user()->tenant;
-        $tid      = $tenant->id;
+        $tenant    = $request->user()->tenant;
+        $tid       = $tenant->id;
         $thisMonth = now()->month;
         $thisYear  = now()->year;
         $lastMonth = now()->subMonth();
 
         $base = fn () => Invoice::where('tenant_id', $tid);
 
-        // This month stats
         $monthlyTotal = (clone $base())
             ->whereYear('invoice_date', $thisYear)
             ->whereMonth('invoice_date', $thisMonth)
@@ -32,24 +30,22 @@ class DashboardController extends Controller
             ->where('payment_status', 'paid')
             ->sum('total_amount');
 
-        // Last month for comparison
         $lastMonthTotal = (clone $base())
             ->whereYear('invoice_date', $lastMonth->year)
             ->whereMonth('invoice_date', $lastMonth->month)
             ->sum('total_amount');
 
-        // Outstanding (all time balance due)
+        // MongoDB-compatible: compute outstanding in PHP
         $totalOutstanding = (clone $base())
             ->whereIn('payment_status', ['unpaid', 'partial'])
-            ->selectRaw('SUM(total_amount - amount_paid) as bal')
-            ->value('bal') ?? 0;
+            ->get(['total_amount', 'amount_paid'])
+            ->sum(fn ($i) => $i->total_amount - $i->amount_paid);
 
-        // Overdue
         $overdueInvoices = (clone $base())
             ->with('customer:id,name')
             ->whereIn('payment_status', ['unpaid', 'partial'])
             ->whereNotNull('due_date')
-            ->whereDate('due_date', '<', today())
+            ->where('due_date', '<', now()->toDateString())
             ->orderBy('due_date')
             ->limit(5)
             ->get(['id', 'invoice_number', 'customer_id', 'due_date', 'total_amount', 'amount_paid', 'payment_status']);
@@ -57,20 +53,30 @@ class DashboardController extends Controller
         $overdueCount = (clone $base())
             ->whereIn('payment_status', ['unpaid', 'partial'])
             ->whereNotNull('due_date')
-            ->whereDate('due_date', '<', today())
+            ->where('due_date', '<', now()->toDateString())
             ->count();
 
-        // Top customers by total billed (all time)
-        $topCustomers = Customer::where('customers.tenant_id', $tid)
-            ->join('invoices', 'invoices.customer_id', '=', 'customers.id')
-            ->where('invoices.tenant_id', $tid)
-            ->selectRaw('customers.id, customers.name, SUM(invoices.total_amount) as total_billed, COUNT(invoices.id) as invoice_count')
-            ->groupBy('customers.id', 'customers.name')
-            ->orderByDesc('total_billed')
-            ->limit(5)
-            ->get();
+        // MongoDB-compatible: top customers without JOIN — group in PHP
+        $invoicesByCustomer = (clone $base())
+            ->get(['customer_id', 'total_amount'])
+            ->groupBy('customer_id');
 
-        // Month-over-month % change
+        $customerIds = $invoicesByCustomer->keys()->all();
+        $customerNames = Customer::whereIn('_id', $customerIds)
+            ->get(['_id', 'name'])
+            ->keyBy(fn ($c) => (string) $c->_id);
+
+        $topCustomers = $invoicesByCustomer
+            ->map(fn ($invoices, $cid) => [
+                'id'            => $cid,
+                'name'          => $customerNames[(string) $cid]?->name ?? 'Unknown',
+                'total_billed'  => $invoices->sum('total_amount'),
+                'invoice_count' => $invoices->count(),
+            ])
+            ->sortByDesc('total_billed')
+            ->take(5)
+            ->values();
+
         $momChange = $lastMonthTotal > 0
             ? round((($monthlyTotal - $lastMonthTotal) / $lastMonthTotal) * 100, 1)
             : null;

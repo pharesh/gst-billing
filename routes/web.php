@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminPlanController;
 use App\Http\Controllers\Admin\AdminTenantController;
+use App\Http\Controllers\Admin\SystemSettingsController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\CreditNoteController;
 use App\Http\Controllers\CustomerController;
@@ -98,6 +99,11 @@ Route::middleware(['auth', 'superadmin'])->prefix('admin')->name('admin.')->grou
     Route::post('/plans', [AdminPlanController::class, 'store'])->name('plans.store');
     Route::patch('/plans/{plan}', [AdminPlanController::class, 'update'])->name('plans.update');
     Route::delete('/plans/{plan}', [AdminPlanController::class, 'destroy'])->name('plans.destroy');
+
+    // System Settings (service credentials stored in MongoDB)
+    Route::get('/system-settings', [SystemSettingsController::class, 'index'])->name('system-settings.index');
+    Route::put('/system-settings', [SystemSettingsController::class, 'bulkUpdate'])->name('system-settings.bulk');
+    Route::put('/system-settings/{key}', [SystemSettingsController::class, 'update'])->name('system-settings.update');
 });
 
 require __DIR__.'/auth.php';

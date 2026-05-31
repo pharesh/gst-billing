@@ -3,7 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -29,7 +29,7 @@ class Customer extends Model
     {
         return $this->invoices()
             ->whereIn('payment_status', ['unpaid', 'partial'])
-            ->selectRaw('SUM(total_amount - amount_paid) as outstanding')
-            ->value('outstanding') ?? 0;
+            ->get(['total_amount', 'amount_paid'])
+            ->sum(fn ($i) => $i->total_amount - $i->amount_paid);
     }
 }
