@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasIntegerPrimaryKey;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Tenant extends Model
 {
-    use HasFactory;
+    use HasFactory, HasIntegerPrimaryKey;
 
     protected $fillable = [
         'name', 'gstin', 'address', 'city', 'state', 'state_code',

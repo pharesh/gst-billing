@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Traits\HasIntegerPrimaryKey;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Supplier extends Model
 {
-    use HasFactory;
+    use HasFactory, HasIntegerPrimaryKey;
 
     protected $fillable = [
         'tenant_id', 'name', 'gstin', 'supplier_type',

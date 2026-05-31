@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasIntegerPrimaryKey;
 use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class InvoiceItem extends Model
 {
+    use HasIntegerPrimaryKey;
     protected $fillable = [
         'invoice_id', 'product_id', 'description', 'hsn_sac_code', 'unit',
         'quantity', 'price', 'discount_percent', 'taxable_amount',

@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasIntegerPrimaryKey;
 use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Subscription extends Model
 {
+    use HasIntegerPrimaryKey;
     protected $fillable = [
         'tenant_id', 'plan_id', 'status', 'starts_at', 'ends_at',
         'razorpay_order_id', 'razorpay_payment_id', 'razorpay_subscription_id', 'amount_paid',

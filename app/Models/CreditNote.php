@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Traits\HasIntegerPrimaryKey;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CreditNote extends Model
 {
-    use HasFactory;
+    use HasFactory, HasIntegerPrimaryKey;
 
     protected $fillable = [
         'tenant_id', 'customer_id', 'invoice_id', 'credit_note_number',

@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasIntegerPrimaryKey;
 use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Payment extends Model
 {
+    use HasIntegerPrimaryKey;
     protected $fillable = [
         'tenant_id', 'invoice_id', 'amount', 'payment_date',
         'payment_method', 'reference_number', 'notes',

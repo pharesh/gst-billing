@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasIntegerPrimaryKey;
 use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CreditNoteItem extends Model
 {
+    use HasIntegerPrimaryKey;
     protected $fillable = [
         'credit_note_id', 'description', 'hsn_sac_code', 'unit',
         'quantity', 'price', 'gst_rate',

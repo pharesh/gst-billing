@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "2f8bd498dd03733fa0cf26889b99783a",
+    "content-hash": "d922531f9e19370b8b4da30cab59c1d7",
     "packages": [
         {
             "name": "barryvdh/laravel-dompdf",
@@ -2518,29 +2518,28 @@
         },
         {
             "name": "mongodb/laravel-mongodb",
-            "version": "5.4.0",
+            "version": "5.7.0",
             "source": {
                 "type": "git",
-                "url": "https://github.com/mongodb/laravel-mongodb.git",
-                "reference": "bcf97d233b7394a7eee09285a96ab54665cdf5bc"
+                "url": "https://github.com/mongodb/laravel-mongodb",
+                "reference": "0071a45e79741f316f9b8e3a0372c8881ba5f81f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/mongodb/laravel-mongodb/zipball/bcf97d233b7394a7eee09285a96ab54665cdf5bc",
-                "reference": "bcf97d233b7394a7eee09285a96ab54665cdf5bc",
+                "url": "https://api.github.com/repos/mongodb/laravel-mongodb/zipball/0071a45e79741f316f9b8e3a0372c8881ba5f81f",
+                "reference": "0071a45e79741f316f9b8e3a0372c8881ba5f81f",
                 "shasum": ""
             },
             "require": {
                 "composer-runtime-api": "^2.0.0",
                 "ext-mongodb": "^1.21|^2",
-                "illuminate/cache": "^10.36|^11|^12",
-                "illuminate/container": "^10.0|^11|^12",
-                "illuminate/database": "^10.30|^11|^12",
-                "illuminate/events": "^10.0|^11|^12",
-                "illuminate/support": "^10.0|^11|^12",
+                "illuminate/cache": "^10.36|^11|^12|^13.0",
+                "illuminate/container": "^10.0|^11|^12|^13.0",
+                "illuminate/database": "^10.30|^11|^12|^13.0",
+                "illuminate/events": "^10.0|^11|^12|^13.0",
+                "illuminate/support": "^10.0|^11|^12|^13.0",
                 "mongodb/mongodb": "^1.21|^2",
-                "php": "^8.1",
-                "symfony/http-foundation": "^6.4|^7"
+                "php": "^8.1"
             },
             "conflict": {
                 "illuminate/bus": "< 10.37.2"
@@ -2549,15 +2548,15 @@
                 "jenssegers/mongodb": "self.version"
             },
             "require-dev": {
-                "doctrine/coding-standard": "12.0.x-dev",
+                "doctrine/coding-standard": "^12.0",
                 "laravel/scout": "^10.3",
                 "league/flysystem-gridfs": "^3.28",
                 "league/flysystem-read-only": "^3.0",
                 "mockery/mockery": "^1.4.4",
-                "orchestra/testbench": "^8.0|^9.0|^10.0",
-                "phpstan/phpstan": "^1.10",
-                "phpunit/phpunit": "^10.3|^11.5.3",
-                "rector/rector": "^1.2",
+                "orchestra/testbench": "^8.0|^9.0|^10.0|^11.0",
+                "phpstan/phpstan": "^1.10|^2.1",
+                "phpunit/phpunit": "^10.3|^11.5.3|^12.5.12",
+                "rector/rector": "^1.2|^2.3",
                 "spatie/laravel-query-builder": "^5.6|^6"
             },
             "suggest": {
@@ -2588,6 +2587,11 @@
                     "role": "Leader"
                 },
                 {
+                    "name": "Pauline Vos",
+                    "email": "pauline.vos@mongodb.com",
+                    "role": "Maintainer"
+                },
+                {
                     "name": "Jérôme Tamarelle",
                     "email": "jerome.tamarelle@mongodb.com",
                     "role": "Maintainer"
@@ -2615,10 +2619,9 @@
             ],
             "support": {
                 "issues": "https://www.mongodb.com/support",
-                "security": "https://www.mongodb.com/security",
-                "source": "https://github.com/mongodb/laravel-mongodb/tree/5.4.0"
+                "security": "https://www.mongodb.com/security"
             },
-            "time": "2025-04-18T09:03:22+00:00"
+            "time": "2026-03-20T12:20:25+00:00"
         },
         {
             "name": "mongodb/mongodb",

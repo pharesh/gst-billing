@@ -2,11 +2,13 @@
 
 namespace App\Models;
 
+use App\Traits\HasIntegerPrimaryKey;
 use MongoDB\Laravel\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Plan extends Model
 {
+    use HasIntegerPrimaryKey;
     protected $fillable = [
         'name', 'slug', 'price_monthly', 'invoice_limit', 'customer_limit',
         'product_limit', 'whatsapp_enabled', 'gstr_export', 'pdf_download',
