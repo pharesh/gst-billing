@@ -32,3 +32,11 @@ CMD php artisan config:cache && \
     php artisan route:cache && \
     php artisan migrate --force && \
     php artisan serve --host=0.0.0.0 --port=${PORT:-8000}
+
+RUN apt-get update && apt-get install -y \
+    git curl zip unzip libzip-dev libpng-dev libonig-dev libxml2-dev libssl-dev pkg-config \
+    autoconf make g++ \
+    && docker-php-ext-install zip mbstring \
+    && pecl install mongodb \
+    && docker-php-ext-enable mongodb \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
