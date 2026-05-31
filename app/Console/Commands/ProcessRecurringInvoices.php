@@ -16,10 +16,14 @@ class ProcessRecurringInvoices extends Command
 
     public function handle(GSTCalculationService $gst): int
     {
+        // MongoDB stores dates as strings (Y-m-d); use direct where comparison
+        // instead of whereDate which requires BSON Date objects
+        $today = today()->toDateString();
+
         $due = RecurringInvoice::with('tenant')
             ->where('is_active', true)
-            ->whereDate('next_run_date', '<=', today())
-            ->where(fn ($q) => $q->whereNull('end_date')->orWhereDate('end_date', '>=', today()))
+            ->where('next_run_date', '<=', $today)
+            ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $today))
             ->get();
 
         $this->info("Processing {$due->count()} recurring invoice(s)...");

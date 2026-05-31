@@ -11,8 +11,14 @@ class AdminPlanController extends Controller
 {
     public function index()
     {
+        // withCount() is not supported by MongoDB; load tenants and count in PHP
+        $plans = Plan::orderBy('sort_order')->get();
+        $plans->each(function ($plan) {
+            $plan->tenants_count = $plan->tenants()->count();
+        });
+
         return Inertia::render('Admin/Plans/Index', [
-            'plans' => Plan::withCount('tenants')->orderBy('sort_order')->get(),
+            'plans' => $plans,
         ]);
     }
 

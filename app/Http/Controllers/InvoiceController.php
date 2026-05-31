@@ -33,8 +33,8 @@ class InvoiceController extends Controller
                 ->orWhereHas('customer', fn ($c) => $c->where('name', 'like', "%{$request->search}%")))
             ->when($request->status,      fn ($q) => $q->where('payment_status', $request->status))
             ->when($request->customer_id, fn ($q) => $q->where('customer_id', $request->customer_id))
-            ->when($request->date_from,   fn ($q) => $q->whereDate('invoice_date', '>=', $request->date_from))
-            ->when($request->date_to,     fn ($q) => $q->whereDate('invoice_date', '<=', $request->date_to))
+            ->when($request->date_from,   fn ($q) => $q->where('invoice_date', '>=', $request->date_from))
+            ->when($request->date_to,     fn ($q) => $q->where('invoice_date', '<=', $request->date_to))
             ->latest('invoice_date')
             ->paginate(20)
             ->withQueryString();
@@ -50,7 +50,7 @@ class InvoiceController extends Controller
                 'paid'    => (clone $base)->where('payment_status', 'paid')->sum('total_amount'),
                 'unpaid'  => (clone $base)->whereIn('payment_status', ['unpaid', 'partial'])->sum('total_amount'),
                 'overdue' => (clone $base)->whereIn('payment_status', ['unpaid', 'partial'])
-                                ->whereNotNull('due_date')->whereDate('due_date', '<', today())->count(),
+                                ->whereNotNull('due_date')->where('due_date', '<', today()->toDateString())->count(),
             ],
         ]);
     }

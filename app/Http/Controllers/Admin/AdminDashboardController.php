@@ -21,7 +21,10 @@ class AdminDashboardController extends Controller
             ->get()
             ->sum(fn ($s) => $s->plan?->price_monthly ?? 0);
 
-        $newThisMonth = Tenant::whereMonth('created_at', now()->month)->count();
+        // MongoDB stores dates as strings; use range query instead of whereMonth
+        $newThisMonth = Tenant::where('created_at', '>=', now()->startOfMonth()->toDateTimeString())
+            ->where('created_at', '<=', now()->endOfMonth()->toDateTimeString())
+            ->count();
 
         $recentTenants = Tenant::with(['plan', 'activeSubscription.plan'])
             ->latest()

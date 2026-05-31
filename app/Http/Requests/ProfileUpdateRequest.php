@@ -16,6 +16,8 @@ class ProfileUpdateRequest extends FormRequest
      */
     public function rules(): array
     {
+        $userId = $this->user()->id;
+
         return [
             'name' => ['required', 'string', 'max:255'],
             'email' => [
@@ -24,7 +26,11 @@ class ProfileUpdateRequest extends FormRequest
                 'lowercase',
                 'email',
                 'max:255',
-                Rule::unique(User::class)->ignore($this->user()->id),
+                // MongoDB stores integer PKs in the 'id' field, not '_id'.
+                // Rule::unique()->ignore() resolves to _id which is wrong here.
+                // Use a where() condition on the 'id' field instead.
+                Rule::unique(User::class, 'email')
+                    ->where(fn ($q) => $q->where('id', '!=', $userId)),
             ],
         ];
     }

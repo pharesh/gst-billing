@@ -13,26 +13,31 @@ class DashboardController extends Controller
     {
         $tenant    = $request->user()->tenant;
         $tid       = $tenant->id;
-        $thisMonth = now()->month;
-        $thisYear  = now()->year;
         $lastMonth = now()->subMonth();
 
         $base = fn () => Invoice::where('tenant_id', $tid);
 
+        // MongoDB stores dates as strings (Y-m-d), so use range queries instead
+        // of whereYear/whereMonth which require BSON Date types
+        $monthStart  = now()->startOfMonth()->format('Y-m-d');
+        $monthEnd    = now()->endOfMonth()->format('Y-m-d');
+        $lmStart     = $lastMonth->copy()->startOfMonth()->format('Y-m-d');
+        $lmEnd       = $lastMonth->copy()->endOfMonth()->format('Y-m-d');
+
         $monthlyTotal = (clone $base())
-            ->whereYear('invoice_date', $thisYear)
-            ->whereMonth('invoice_date', $thisMonth)
+            ->where('invoice_date', '>=', $monthStart)
+            ->where('invoice_date', '<=', $monthEnd)
             ->sum('total_amount');
 
         $monthlyPaid = (clone $base())
-            ->whereYear('invoice_date', $thisYear)
-            ->whereMonth('invoice_date', $thisMonth)
+            ->where('invoice_date', '>=', $monthStart)
+            ->where('invoice_date', '<=', $monthEnd)
             ->where('payment_status', 'paid')
             ->sum('total_amount');
 
         $lastMonthTotal = (clone $base())
-            ->whereYear('invoice_date', $lastMonth->year)
-            ->whereMonth('invoice_date', $lastMonth->month)
+            ->where('invoice_date', '>=', $lmStart)
+            ->where('invoice_date', '<=', $lmEnd)
             ->sum('total_amount');
 
         // MongoDB-compatible: compute outstanding in PHP

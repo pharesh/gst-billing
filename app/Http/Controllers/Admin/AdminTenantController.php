@@ -9,20 +9,30 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class AdminTenantController extends Controller
 {
     public function index(Request $request)
     {
-        $tenants = Tenant::with(['plan', 'activeSubscription.plan', 'users'])
-            ->withCount(['invoices', 'customers', 'users'])
+        // withCount() is not supported by MongoDB; load relationships and count in PHP
+        $tenants = Tenant::with(['plan', 'activeSubscription.plan', 'users', 'invoices', 'customers'])
             ->when($request->search, fn ($q) => $q->where('name', 'like', "%{$request->search}%")
                 ->orWhere('email', 'like', "%{$request->search}%"))
             ->when($request->plan, fn ($q) => $q->whereHas('plan', fn ($p) => $p->where('slug', $request->plan)))
             ->latest()
             ->paginate(20)
             ->withQueryString();
+
+        // Append _count attributes to mimic withCount() output
+        $tenants->each(function ($tenant) {
+            $tenant->invoices_count  = $tenant->invoices->count();
+            $tenant->customers_count = $tenant->customers->count();
+            $tenant->users_count     = $tenant->users->count();
+            // Unset loaded collections to keep payload size manageable
+            unset($tenant->invoices, $tenant->customers);
+        });
 
         return Inertia::render('Admin/Tenants/Index', [
             'tenants' => $tenants,
@@ -78,15 +88,17 @@ class AdminTenantController extends Controller
     public function show(Tenant $tenant)
     {
         $tenant->load(['plan', 'users', 'subscriptions.plan']);
-        $tenant->loadCount(['invoices', 'customers', 'payments']);
+        // loadCount() is not supported by MongoDB; count via relationship queries
+        $invoiceCount  = $tenant->invoices()->count();
+        $customerCount = $tenant->customers()->count();
 
         return Inertia::render('Admin/Tenants/Show', [
             'tenant' => $tenant,
             'plans'  => Plan::orderBy('sort_order')->get(),
             'stats'  => [
                 'total_revenue'   => $tenant->payments()->sum('amount'),
-                'invoice_count'   => $tenant->invoices_count,
-                'customer_count'  => $tenant->customers_count,
+                'invoice_count'   => $invoiceCount,
+                'customer_count'  => $customerCount,
                 'monthly_invoices'=> $tenant->monthly_invoice_count,
             ],
         ]);
@@ -117,7 +129,14 @@ class AdminTenantController extends Controller
         $request->validate([
             'company_name'   => 'required|string|max:255',
             'owner_name'     => 'required|string|max:255',
-            'email'          => 'required|email|unique:users,email,' . ($ownerUser?->id ?? 0),
+            'email'          => [
+                'required', 'email',
+                // MongoDB stores integer PKs in 'id' field; use where() instead of ignore()
+                // which resolves to _id (the ObjectId) and would not match
+                $ownerUser
+                    ? Rule::unique('users', 'email')->where(fn ($q) => $q->where('id', '!=', $ownerUser->id))
+                    : Rule::unique('users', 'email'),
+            ],
             'gstin'          => ['nullable', 'string', 'size:15'],
             'state'          => 'nullable|string|max:100',
             'invoice_prefix' => 'nullable|string|max:10',

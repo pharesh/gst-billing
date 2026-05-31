@@ -32,11 +32,12 @@ class RecurringInvoice extends Model
 
     public function nextRunAfter(): \Carbon\Carbon
     {
+        // Use copy() to avoid mutating the model's cached Carbon attribute
         return match ($this->frequency) {
-            'weekly'    => $this->next_run_date->addWeek(),
-            'quarterly' => $this->next_run_date->addMonths(3),
-            'yearly'    => $this->next_run_date->addYear(),
-            default     => $this->next_run_date->addMonth(),
+            'weekly'    => $this->next_run_date->copy()->addWeek(),
+            'quarterly' => $this->next_run_date->copy()->addMonths(3),
+            'yearly'    => $this->next_run_date->copy()->addYear(),
+            default     => $this->next_run_date->copy()->addMonth(),
         };
     }
 }
