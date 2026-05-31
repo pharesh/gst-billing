@@ -41,7 +41,7 @@ RUN mkdir -p bootstrap/cache storage/framework/cache/data \
     storage/framework/sessions storage/framework/views storage/logs \
     && chmod -R 777 bootstrap/cache storage
 
-RUN composer install --no-dev --optimize-autoloader --ignore-platform-reqs
+RUN composer install --no-dev --optimize-autoloader
 
 RUN npm install && npm run build
 
