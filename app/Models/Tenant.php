@@ -23,8 +23,8 @@ class Tenant extends Model
     protected $casts = [
         'subscription_ends_at'   => 'datetime',
         'monthly_count_reset_at' => 'datetime',
-        'bank_details'           => 'array',
         'is_suspended'           => 'boolean',
+        // bank_details: stored as BSON document in MongoDB — no cast needed
     ];
 
     public function plan(): BelongsTo

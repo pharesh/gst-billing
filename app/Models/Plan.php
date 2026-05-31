@@ -16,7 +16,7 @@ class Plan extends Model
     ];
 
     protected $casts = [
-        'features'          => 'array',
+        // features: stored as BSON array in MongoDB — no cast needed
         'whatsapp_enabled'  => 'boolean',
         'gstr_export'       => 'boolean',
         'pdf_download'      => 'boolean',

@@ -24,7 +24,7 @@ class RecurringInvoice extends Model
         'next_run_date' => 'date',
         'last_run_date' => 'date',
         'is_active'     => 'boolean',
-        'items'         => 'array',
+        // items: stored as BSON array in MongoDB — no cast needed
     ];
 
     public function tenant(): BelongsTo   { return $this->belongsTo(Tenant::class); }
