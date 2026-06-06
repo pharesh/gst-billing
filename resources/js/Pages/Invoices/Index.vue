@@ -244,7 +244,7 @@ function exportUrl() {
                                 <td class="px-4 py-3 text-right font-medium">{{ fmt(inv.total_amount) }}</td>
                                 <td class="px-4 py-3">
                                     <span class="px-2 py-0.5 rounded-full text-xs font-semibold" :class="statusClass(inv.payment_status)">
-                                        {{ inv.payment_status.toUpperCase() }}
+                                        {{ (inv.payment_status ?? 'unpaid').toUpperCase() }}
                                     </span>
                                 </td>
                                 <td class="px-4 py-3">

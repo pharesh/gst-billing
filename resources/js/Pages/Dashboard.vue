@@ -16,6 +16,12 @@ function fmt(n) {
     return '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
 }
 
+function fmtDate(d) {
+    if (!d) return '—';
+    const [y, m, day] = d.substring(0, 10).split('-');
+    return `${day}-${m}-${y}`;
+}
+
 function fmtCompact(n) {
     const v = Number(n || 0);
     if (v >= 10000000) return '₹' + (v / 10000000).toFixed(1) + 'Cr';
@@ -238,11 +244,11 @@ function taxPct(val) {
                                         <Link :href="route('invoices.show', inv.id)">{{ inv.invoice_number }}</Link>
                                     </td>
                                     <td class="px-4 py-3 text-gray-700 truncate max-w-[120px]">{{ inv.customer?.name }}</td>
-                                    <td class="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{{ inv.invoice_date }}</td>
+                                    <td class="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{{ fmtDate(inv.invoice_date) }}</td>
                                     <td class="px-4 py-3 text-right font-medium whitespace-nowrap">{{ fmt(inv.total_amount) }}</td>
                                     <td class="px-4 py-3">
                                         <span class="px-2 py-0.5 rounded text-xs font-semibold" :class="statusClass(inv.payment_status)">
-                                            {{ inv.payment_status.toUpperCase() }}
+                                            {{ (inv.payment_status ?? 'unpaid').toUpperCase() }}
                                         </span>
                                     </td>
                                 </tr>

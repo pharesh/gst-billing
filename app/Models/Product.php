@@ -33,6 +33,7 @@ class Product extends Model
 
     public function scopeActive($query)
     {
-        return $query->where('is_active', true);
+        // Match boolean true OR integer 1 (MySQL-migrated data stores 1, not true)
+        return $query->where('is_active', '!=', false)->whereNotNull('is_active');
     }
 }

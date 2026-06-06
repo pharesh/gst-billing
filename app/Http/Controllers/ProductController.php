@@ -34,7 +34,7 @@ class ProductController extends Controller
             'gst_rate' => 'required|numeric|in:0,0.1,0.25,1,1.5,3,5,6,7.5,12,18,28',
         ]);
 
-        Product::create([...$validated, 'tenant_id' => $request->user()->tenant_id]);
+        Product::create([...$validated, 'tenant_id' => $request->user()->tenant_id, 'is_active' => true]);
 
         return back()->with('success', 'Product added.');
     }

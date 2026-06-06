@@ -116,6 +116,8 @@ class InvoiceController extends Controller
                 'due_date' => $validated['due_date'] ?? null,
                 'invoice_type' => $validated['invoice_type'],
                 'supply_type' => $validated['supply_type'],
+                'payment_status' => 'unpaid',
+                'amount_paid' => 0,
                 'notes' => $validated['notes'] ?? null,
                 'terms' => $validated['terms'] ?? null,
                 ...$totals,
