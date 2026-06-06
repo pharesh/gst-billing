@@ -92,6 +92,12 @@ function fmt(n) {
     return '₹' + Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 });
 }
 
+function fmtDate(d) {
+    if (!d) return '—';
+    const [y, m, day] = d.substring(0, 10).split('-');
+    return `${day}-${m}-${y}`;
+}
+
 const hasFilters = () => search.value || status.value || customerId.value || dateFrom.value || dateTo.value;
 
 function exportUrl() {
@@ -230,10 +236,10 @@ function exportUrl() {
                                     <Link :href="route('invoices.show', inv.id)">{{ inv.invoice_number }}</Link>
                                 </td>
                                 <td class="px-4 py-3 text-gray-700">{{ inv.customer?.name }}</td>
-                                <td class="px-4 py-3 text-gray-500 text-xs">{{ inv.invoice_date }}</td>
+                                <td class="px-4 py-3 text-gray-500 text-xs">{{ fmtDate(inv.invoice_date) }}</td>
                                 <td class="px-4 py-3 text-xs"
                                     :class="inv.payment_status !== 'paid' && inv.due_date && new Date(inv.due_date) < new Date() ? 'text-red-600 font-medium' : 'text-gray-500'">
-                                    {{ inv.due_date || '—' }}
+                                    {{ fmtDate(inv.due_date) }}
                                 </td>
                                 <td class="px-4 py-3 text-right font-medium">{{ fmt(inv.total_amount) }}</td>
                                 <td class="px-4 py-3">

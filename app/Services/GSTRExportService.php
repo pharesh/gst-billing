@@ -17,7 +17,7 @@ class GSTRExportService
         // MongoDB stores dates as strings (Y-m-d); use range query instead of
         // whereMonth/whereYear which require BSON Date objects
         $startDate = sprintf('%04d-%02d-01', $year, $month);
-        $endDate   = sprintf('%04d-%02d-%02d', $year, $month, cal_days_in_month(CAL_GREGORIAN, $month, $year));
+        $endDate   = sprintf('%04d-%02d-%02d', $year, $month, date('t', mktime(0, 0, 0, $month, 1, $year)));
 
         $invoices = Invoice::with(['customer', 'items'])
             ->where('tenant_id', $tenant->id)
@@ -42,7 +42,7 @@ class GSTRExportService
         // MongoDB stores dates as strings (Y-m-d); use range query instead of
         // whereMonth/whereYear which require BSON Date objects
         $startDate = sprintf('%04d-%02d-01', $year, $month);
-        $endDate   = sprintf('%04d-%02d-%02d', $year, $month, cal_days_in_month(CAL_GREGORIAN, $month, $year));
+        $endDate   = sprintf('%04d-%02d-%02d', $year, $month, date('t', mktime(0, 0, 0, $month, 1, $year)));
 
         $invoices = Invoice::with('items')
             ->where('tenant_id', $tenant->id)

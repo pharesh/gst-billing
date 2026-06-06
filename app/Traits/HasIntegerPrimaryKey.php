@@ -25,6 +25,11 @@ trait HasIntegerPrimaryKey
         });
     }
 
+    public function resolveRouteBinding($value, $field = null): ?static
+    {
+        return $this->where($field ?? $this->getRouteKeyName(), (int) $value)->first();
+    }
+
     protected static function nextIntegerId($model): int
     {
         $table  = $model->getTable();
