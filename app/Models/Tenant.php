@@ -158,4 +158,46 @@ class Tenant extends Model
 
         return $this->invoice_prefix . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
     }
+
+    public function nextPurchaseBillNumber(): string
+    {
+        $prefix = $this->invoice_prefix . '-PB';
+        $max = \App\Models\PurchaseInvoice::where('tenant_id', $this->id)
+            ->where('bill_number', 'like', $prefix . '-%')
+            ->pluck('bill_number')
+            ->map(fn ($n) => (int) substr(strrchr($n, '-'), 1))
+            ->max();
+
+        $count = ($max ?? 0) + 1;
+
+        return $prefix . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+    }
+
+    public function nextDebitNoteNumber(): string
+    {
+        $prefix = $this->invoice_prefix . '-DN';
+        $max = \App\Models\DebitNote::where('tenant_id', $this->id)
+            ->where('debit_note_number', 'like', $prefix . '-%')
+            ->pluck('debit_note_number')
+            ->map(fn ($n) => (int) substr(strrchr($n, '-'), 1))
+            ->max();
+
+        $count = ($max ?? 0) + 1;
+
+        return $prefix . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+    }
+
+    public function nextQuotationNumber(): string
+    {
+        $prefix = $this->invoice_prefix . '-QT';
+        $max = \App\Models\Quotation::where('tenant_id', $this->id)
+            ->where('quotation_number', 'like', $prefix . '-%')
+            ->pluck('quotation_number')
+            ->map(fn ($n) => (int) substr(strrchr($n, '-'), 1))
+            ->max();
+
+        $count = ($max ?? 0) + 1;
+
+        return $prefix . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+    }
 }

@@ -7,6 +7,7 @@ const props = defineProps({
     invoice: Object,
     gstGroups: Array,
     amountInWords: String,
+    razorpayKey: String,
 });
 
 const showPaymentForm = ref(false);
@@ -47,6 +48,51 @@ function sendReminder() {
     if (confirm('Send payment reminder to customer via email & WhatsApp?')) {
         router.post(route('invoices.reminder', props.invoice.id));
     }
+}
+
+const linkCopied = ref(false);
+const paymentLink = ref(props.invoice.razorpay_payment_link_url || '');
+
+const showCancelIRN  = ref(false);
+const cancelReason   = ref('1');
+const CANCEL_REASONS = {
+    '1': 'Duplicate',
+    '2': 'Data Entry Mistake',
+    '3': 'Order Cancelled',
+    '4': 'Others',
+};
+
+function generateIRN() {
+    if (!confirm('Generate IRN for this invoice via NIC e-Invoice API?')) return;
+    router.post(route('invoices.irn.generate', props.invoice.id));
+}
+
+function cancelIRN() {
+    router.post(route('invoices.irn.cancel', props.invoice.id), { cancel_reason: cancelReason.value }, {
+        onSuccess: () => { showCancelIRN.value = false; },
+    });
+}
+
+function generatePaymentLink() {
+    router.post(route('invoices.payment-link', props.invoice.id), {}, {
+        onSuccess: (page) => {
+            if (page.props.flash?.payment_link) {
+                paymentLink.value = page.props.flash.payment_link;
+            }
+        },
+    });
+}
+
+function copyLink() {
+    if (paymentLink.value) {
+        navigator.clipboard.writeText(paymentLink.value);
+        linkCopied.value = true;
+        setTimeout(() => { linkCopied.value = false; }, 2000);
+    }
+}
+
+function syncPaymentLink() {
+    router.post(route('invoices.payment-link.sync', props.invoice.id));
 }
 
 function statusClass(s) {
@@ -105,6 +151,83 @@ function fmt(n) {
                 </div>
                 <div v-if="$page.props.flash?.error" class="px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
                     {{ $page.props.flash.error }}
+                </div>
+
+                <!-- e-Invoice IRN Section -->
+                <div class="bg-white rounded-lg shadow p-5">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-800">e-Invoice (IRN)</h3>
+                            <p class="text-xs text-gray-500 mt-0.5">Mandatory for businesses with turnover &gt; ₹5 Cr. Generates an IRN + QR code via NIC API.</p>
+                        </div>
+                        <div class="flex gap-2 items-center">
+                            <template v-if="!invoice.irn">
+                                <button @click="generateIRN" class="px-3 py-1.5 bg-teal-600 text-white rounded-lg text-sm hover:bg-teal-700">
+                                    Generate IRN
+                                </button>
+                            </template>
+                            <template v-else>
+                                <div class="text-right">
+                                    <div class="text-xs text-gray-500 mb-1">
+                                        <span class="font-mono text-teal-700 text-xs">{{ invoice.irn }}</span>
+                                    </div>
+                                    <div class="text-xs text-gray-400">
+                                        Ack: {{ invoice.ack_no }} &nbsp;|&nbsp; {{ invoice.ack_date }}
+                                    </div>
+                                </div>
+                                <span class="px-2 py-0.5 rounded-full text-xs font-bold"
+                                      :class="invoice.irn_status === 'cancelled' ? 'bg-red-100 text-red-700' : 'bg-teal-100 text-teal-700'">
+                                    {{ invoice.irn_status?.toUpperCase() }}
+                                </span>
+                                <button v-if="invoice.irn_status !== 'cancelled'" @click="showCancelIRN = !showCancelIRN"
+                                        class="px-3 py-1.5 border border-red-300 text-red-600 rounded-lg text-sm hover:bg-red-50">
+                                    Cancel IRN
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                    <!-- Cancel IRN Form -->
+                    <div v-if="showCancelIRN" class="mt-3 pt-3 border-t flex items-center gap-3">
+                        <label class="text-sm text-gray-600">Cancel Reason:</label>
+                        <select v-model="cancelReason" class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm">
+                            <option v-for="(label, val) in CANCEL_REASONS" :key="val" :value="val">{{ label }}</option>
+                        </select>
+                        <button @click="cancelIRN" class="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700">Confirm Cancel</button>
+                        <button @click="showCancelIRN = false" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm">Close</button>
+                    </div>
+                </div>
+
+                <!-- Razorpay Payment Link Section -->
+                <div v-if="invoice.payment_status !== 'paid' && razorpayKey" class="bg-white rounded-lg shadow p-5">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm font-semibold text-gray-800">Online Payment Link</h3>
+                            <p class="text-xs text-gray-500 mt-0.5">Share a Razorpay payment link with the customer to collect payment online.</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <button
+                                v-if="!paymentLink"
+                                @click="generatePaymentLink"
+                                class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700"
+                            >
+                                Generate Link
+                            </button>
+                            <template v-else>
+                                <input :value="paymentLink" readonly
+                                       class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-mono text-indigo-700 bg-indigo-50 w-64" />
+                                <button @click="copyLink" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-50" :class="linkCopied ? 'text-green-600 border-green-400' : 'text-gray-700'">
+                                    {{ linkCopied ? '✓ Copied' : 'Copy' }}
+                                </button>
+                                <a :href="paymentLink" target="_blank" class="px-3 py-1.5 border border-indigo-300 text-indigo-700 rounded-lg text-sm hover:bg-indigo-50">Open</a>
+                                <button @click="syncPaymentLink" class="px-3 py-1.5 border border-green-400 text-green-700 rounded-lg text-sm hover:bg-green-50">
+                                    Sync Status
+                                </button>
+                            </template>
+                        </div>
+                    </div>
+                    <div v-if="invoice.razorpay_payment_link_status" class="mt-2 text-xs text-gray-500">
+                        Link status: <span class="font-medium" :class="invoice.razorpay_payment_link_status === 'paid' ? 'text-green-600' : 'text-gray-700'">{{ invoice.razorpay_payment_link_status?.toUpperCase() }}</span>
+                    </div>
                 </div>
 
                 <!-- Record Payment Form -->

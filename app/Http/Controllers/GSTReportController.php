@@ -15,6 +15,57 @@ class GSTReportController extends Controller
         return Inertia::render('Reports/Index');
     }
 
+    public function aging(Request $request)
+    {
+        $tenant = $request->user()->tenant;
+
+        $unpaid = \App\Models\Invoice::with('customer:id,name')
+            ->where('tenant_id', $tenant->id)
+            ->whereIn('payment_status', ['unpaid', 'partial'])
+            ->whereNotNull('due_date')
+            ->orderBy('due_date')
+            ->get(['id', 'invoice_number', 'customer_id', 'due_date', 'total_amount', 'amount_paid']);
+
+        $buckets = [
+            'current' => [],
+            '1_30'    => [],
+            '31_60'   => [],
+            '61_90'   => [],
+            'over_90' => [],
+        ];
+
+        foreach ($unpaid as $inv) {
+            $daysOverdue = (int) max(0, now()->diffInDays($inv->due_date, false) * -1);
+            $balance     = round($inv->total_amount - $inv->amount_paid, 2);
+
+            $row = [
+                'id'             => $inv->id,
+                'invoice_number' => $inv->invoice_number,
+                'customer_name'  => $inv->customer?->name,
+                'due_date'       => $inv->due_date?->format('Y-m-d'),
+                'days_overdue'   => $daysOverdue,
+                'balance_due'    => $balance,
+            ];
+
+            if ($daysOverdue === 0)      $buckets['current'][] = $row;
+            elseif ($daysOverdue <= 30)  $buckets['1_30'][]    = $row;
+            elseif ($daysOverdue <= 60)  $buckets['31_60'][]   = $row;
+            elseif ($daysOverdue <= 90)  $buckets['61_90'][]   = $row;
+            else                         $buckets['over_90'][] = $row;
+        }
+
+        $summary = collect($buckets)->map(fn ($rows) => [
+            'count' => count($rows),
+            'total' => round(collect($rows)->sum('balance_due'), 2),
+        ]);
+
+        return Inertia::render('Reports/Aging', [
+            'buckets'           => $buckets,
+            'summary'           => $summary,
+            'total_outstanding' => round($unpaid->sum(fn ($i) => $i->total_amount - $i->amount_paid), 2),
+        ]);
+    }
+
     public function gstr1(Request $request)
     {
         $request->validate([

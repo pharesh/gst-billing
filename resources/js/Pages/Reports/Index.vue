@@ -19,6 +19,10 @@ function viewGSTR3B() {
 function downloadGSTR1() {
     window.location.href = route('reports.gstr1.download') + `?month=${month.value}&year=${year.value}`;
 }
+
+function downloadPaymentsCSV() {
+    window.location.href = route('payments.export') + `?date_from=${year.value}-${String(month.value).padStart(2,'0')}-01&date_to=${year.value}-${String(month.value).padStart(2,'0')}-31`;
+}
 </script>
 
 <template>
@@ -65,6 +69,20 @@ function downloadGSTR1() {
                         <div class="text-sm text-gray-500 mb-4">Summary return with tax liability. File by 20th of next month.</div>
                         <div class="flex gap-2">
                             <button @click="viewGSTR3B" class="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700">View Summary</button>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="text-base font-bold text-gray-800 mb-1">Payments CSV</div>
+                        <div class="text-sm text-gray-500 mb-4">Download all payments received for the selected month. Open in Excel or Google Sheets.</div>
+                        <div class="flex gap-2">
+                            <button @click="downloadPaymentsCSV" class="px-3 py-2 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">↓ Download CSV</button>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <div class="text-base font-bold text-gray-800 mb-1">Aging Report</div>
+                        <div class="text-sm text-gray-500 mb-4">See overdue invoices bucketed by 0–30, 31–60, 61–90, and 90+ days. Track outstanding receivables.</div>
+                        <div class="flex gap-2">
+                            <a :href="route('reports.aging')" class="px-3 py-2 bg-orange-600 text-white rounded-lg text-sm hover:bg-orange-700">View Aging Report</a>
                         </div>
                     </div>
                 </div>

@@ -38,6 +38,14 @@ return [
         'secret' => env('RAZORPAY_SECRET'),
     ],
 
+    'einvoice' => [
+        'sandbox'       => env('EINVOICE_SANDBOX', true),
+        'client_id'     => env('EINVOICE_CLIENT_ID', ''),
+        'client_secret' => env('EINVOICE_CLIENT_SECRET', ''),
+        'username'      => env('EINVOICE_USERNAME', ''),
+        'password'      => env('EINVOICE_PASSWORD', ''),
+    ],
+
     'slack' => [
         'notifications' => [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),

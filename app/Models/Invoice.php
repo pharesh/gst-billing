@@ -17,6 +17,9 @@ class Invoice extends Model
         'subtotal', 'cgst_amount', 'sgst_amount', 'igst_amount',
         'discount_amount', 'total_amount', 'amount_paid',
         'payment_status', 'notes', 'terms',
+        'razorpay_payment_link_id', 'razorpay_payment_link_url', 'razorpay_payment_link_status',
+        // e-Invoice fields
+        'irn', 'ack_no', 'ack_date', 'signed_qr_code', 'irn_status',
     ];
 
     protected $casts = [

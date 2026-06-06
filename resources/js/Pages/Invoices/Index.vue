@@ -1,7 +1,8 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import axios from 'axios';
 
 const props = defineProps({
     invoices: Object,
@@ -16,7 +17,26 @@ const customerId  = ref(props.filters.customer_id || '');
 const dateFrom    = ref(props.filters.date_from   || '');
 const dateTo      = ref(props.filters.date_to     || '');
 
+// Bulk selection
+const selected    = ref([]);
+const bulkWorking = ref(false);
+
+const allSelected = computed(() =>
+    props.invoices.data.length > 0 && selected.value.length === props.invoices.data.length
+);
+
+function toggleAll() {
+    selected.value = allSelected.value ? [] : props.invoices.data.map(i => i.id);
+}
+
+function toggleOne(id) {
+    const idx = selected.value.indexOf(id);
+    if (idx === -1) selected.value.push(id);
+    else selected.value.splice(idx, 1);
+}
+
 function applyFilters() {
+    selected.value = [];
     router.get(route('invoices.index'), {
         search:      search.value,
         status:      status.value,
@@ -29,7 +49,35 @@ function applyFilters() {
 function clearFilters() {
     search.value = ''; status.value = ''; customerId.value = '';
     dateFrom.value = ''; dateTo.value = '';
+    selected.value = [];
     router.get(route('invoices.index'), {}, { preserveState: false });
+}
+
+async function bulkDownloadZip() {
+    if (!selected.value.length) return;
+    bulkWorking.value = true;
+    try {
+        const res = await axios.post(route('invoices.bulk-download'), { ids: selected.value }, { responseType: 'blob' });
+        const url = URL.createObjectURL(res.data);
+        const a   = document.createElement('a');
+        a.href     = url;
+        a.download = 'invoices-' + new Date().toISOString().slice(0,10) + '.zip';
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        alert('Failed to download ZIP. Try selecting fewer invoices.');
+    } finally {
+        bulkWorking.value = false;
+    }
+}
+
+function bulkSendReminder() {
+    if (!selected.value.length) return;
+    if (!confirm(`Send payment reminders for ${selected.value.length} invoice(s)?`)) return;
+    bulkWorking.value = true;
+    router.post(route('invoices.bulk-reminder'), { ids: selected.value }, {
+        onFinish: () => { bulkWorking.value = false; selected.value = []; },
+    });
 }
 
 function statusClass(s) {
@@ -45,6 +93,17 @@ function fmt(n) {
 }
 
 const hasFilters = () => search.value || status.value || customerId.value || dateFrom.value || dateTo.value;
+
+function exportUrl() {
+    const params = new URLSearchParams();
+    if (search.value)     params.set('search',      search.value);
+    if (status.value)     params.set('status',      status.value);
+    if (customerId.value) params.set('customer_id', customerId.value);
+    if (dateFrom.value)   params.set('date_from',   dateFrom.value);
+    if (dateTo.value)     params.set('date_to',     dateTo.value);
+    const qs = params.toString();
+    return route('invoices.export') + (qs ? '?' + qs : '');
+}
 </script>
 
 <template>
@@ -53,9 +112,14 @@ const hasFilters = () => search.value || status.value || customerId.value || dat
         <template #header>
             <div class="flex items-center justify-between">
                 <h2 class="text-xl font-semibold text-gray-800">Invoices</h2>
-                <Link :href="route('invoices.create')" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">
-                    + New Invoice
-                </Link>
+                <div class="flex gap-2">
+                    <a :href="exportUrl()" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-sm font-medium">
+                        ↓ Export CSV
+                    </a>
+                    <Link :href="route('invoices.create')" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-medium">
+                        + New Invoice
+                    </Link>
+                </div>
             </div>
         </template>
 
@@ -115,11 +179,33 @@ const hasFilters = () => search.value || status.value || customerId.value || dat
                     </div>
                 </div>
 
+                <!-- Bulk Actions Bar -->
+                <div v-if="selected.length > 0" class="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3 flex items-center justify-between">
+                    <span class="text-sm text-indigo-700 font-medium">{{ selected.length }} invoice{{ selected.length !== 1 ? 's' : '' }} selected</span>
+                    <div class="flex gap-2">
+                        <button @click="bulkDownloadZip" :disabled="bulkWorking"
+                                class="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 disabled:opacity-50">
+                            {{ bulkWorking ? 'Preparing...' : '↓ Download ZIP' }}
+                        </button>
+                        <button @click="bulkSendReminder" :disabled="bulkWorking"
+                                class="px-3 py-1.5 bg-orange-500 text-white rounded-lg text-sm hover:bg-orange-600 disabled:opacity-50">
+                            Send Reminders
+                        </button>
+                        <button @click="selected = []" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-600 hover:bg-white">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
                 <!-- Table -->
                 <div class="bg-white rounded-lg shadow overflow-hidden">
                     <table class="w-full text-sm">
                         <thead class="bg-gray-50 text-left">
                             <tr>
+                                <th class="px-4 py-3 w-8">
+                                    <input type="checkbox" :checked="allSelected" @change="toggleAll"
+                                           class="rounded border-gray-300 text-indigo-600" />
+                                </th>
                                 <th class="px-4 py-3 font-medium text-gray-600">Invoice #</th>
                                 <th class="px-4 py-3 font-medium text-gray-600">Customer</th>
                                 <th class="px-4 py-3 font-medium text-gray-600">Date</th>
@@ -130,8 +216,16 @@ const hasFilters = () => search.value || status.value || customerId.value || dat
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
-                            <tr v-for="inv in invoices.data" :key="inv.id" class="hover:bg-gray-50"
-                                :class="inv.payment_status !== 'paid' && inv.due_date && new Date(inv.due_date) < new Date() ? 'bg-red-50' : ''">
+                            <tr v-for="inv in invoices.data" :key="inv.id"
+                                class="hover:bg-gray-50 cursor-pointer"
+                                :class="[
+                                    selected.includes(inv.id) ? 'bg-indigo-50' : '',
+                                    inv.payment_status !== 'paid' && inv.due_date && new Date(inv.due_date) < new Date() ? 'bg-red-50' : ''
+                                ]">
+                                <td class="px-4 py-3" @click.stop>
+                                    <input type="checkbox" :checked="selected.includes(inv.id)" @change="toggleOne(inv.id)"
+                                           class="rounded border-gray-300 text-indigo-600" />
+                                </td>
                                 <td class="px-4 py-3 font-mono font-medium text-indigo-600">
                                     <Link :href="route('invoices.show', inv.id)">{{ inv.invoice_number }}</Link>
                                 </td>
@@ -155,7 +249,7 @@ const hasFilters = () => search.value || status.value || customerId.value || dat
                                 </td>
                             </tr>
                             <tr v-if="invoices.data.length === 0">
-                                <td colspan="7" class="px-4 py-10 text-center text-gray-400">No invoices found.</td>
+                                <td colspan="8" class="px-4 py-10 text-center text-gray-400">No invoices found.</td>
                             </tr>
                         </tbody>
                     </table>

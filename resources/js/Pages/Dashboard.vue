@@ -1,12 +1,15 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import { Head, Link } from '@inertiajs/vue3';
+import { computed } from 'vue';
 
 const props = defineProps({
     stats: Object,
     recentInvoices: Array,
     overdueInvoices: Array,
     topCustomers: Array,
+    monthlyChart: Array,
+    taxThisMonth: Object,
 });
 
 function fmt(n) {
@@ -15,8 +18,9 @@ function fmt(n) {
 
 function fmtCompact(n) {
     const v = Number(n || 0);
-    if (v >= 100000) return '₹' + (v / 100000).toFixed(1) + 'L';
-    if (v >= 1000)   return '₹' + (v / 1000).toFixed(1) + 'K';
+    if (v >= 10000000) return '₹' + (v / 10000000).toFixed(1) + 'Cr';
+    if (v >= 100000)   return '₹' + (v / 100000).toFixed(1) + 'L';
+    if (v >= 1000)     return '₹' + (v / 1000).toFixed(1) + 'K';
     return '₹' + v.toFixed(0);
 }
 
@@ -25,8 +29,40 @@ function statusClass(s) {
 }
 
 function daysPastDue(dueDate) {
-    const days = Math.floor((new Date() - new Date(dueDate)) / 86400000);
-    return days;
+    return Math.floor((new Date() - new Date(dueDate)) / 86400000);
+}
+
+// SVG chart helpers
+const chartH = 120;
+const chartW = 600;
+const barCount = 12;
+const barPad = 4;
+
+const maxVal = computed(() => {
+    const m = Math.max(...(props.monthlyChart || []).map(d => d.total), 1);
+    return m;
+});
+
+function barHeight(val) {
+    return Math.max(2, (val / maxVal.value) * chartH);
+}
+
+function barX(i) {
+    const slotW = chartW / barCount;
+    return i * slotW + barPad;
+}
+
+function barW() {
+    return chartW / barCount - barPad * 2;
+}
+
+const totalTax = computed(() => {
+    const t = props.taxThisMonth || {};
+    return (t.cgst || 0) + (t.sgst || 0) + (t.igst || 0);
+});
+
+function taxPct(val) {
+    return totalTax.value > 0 ? Math.round((val / totalTax.value) * 100) : 0;
 }
 </script>
 
@@ -106,6 +142,84 @@ function daysPastDue(dueDate) {
                         <div class="text-xl mb-1">📊</div>
                         <div class="text-sm font-medium text-gray-700">GST Reports</div>
                     </Link>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="grid grid-cols-3 gap-4">
+
+                    <!-- Monthly Revenue Bar Chart -->
+                    <div class="col-span-2 bg-white rounded-lg shadow p-5">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold text-gray-800">Revenue — Last 12 Months</h3>
+                            <span class="text-xs text-gray-400">hover for amount</span>
+                        </div>
+                        <svg :viewBox="`0 0 ${600} ${chartH + 24}`" class="w-full" style="height:160px;">
+                            <g v-for="(d, i) in monthlyChart" :key="i">
+                                <rect
+                                    :x="barX(i)"
+                                    :y="chartH - barHeight(d.total)"
+                                    :width="barW()"
+                                    :height="barHeight(d.total)"
+                                    :fill="i === 11 ? '#4f46e5' : '#c7d2fe'"
+                                    rx="2"
+                                >
+                                    <title>{{ d.label }}: ₹{{ Number(d.total).toLocaleString('en-IN') }}</title>
+                                </rect>
+                                <text
+                                    :x="barX(i) + barW() / 2"
+                                    :y="chartH + 14"
+                                    text-anchor="middle"
+                                    font-size="7"
+                                    fill="#9ca3af"
+                                >{{ d.label.split(' ')[0] }}</text>
+                            </g>
+                        </svg>
+                        <div class="flex justify-between mt-1 text-xs text-gray-400 px-1">
+                            <span>{{ monthlyChart?.[0]?.label }}</span>
+                            <span class="text-indigo-600 font-medium">{{ monthlyChart?.[11]?.label }} (current)</span>
+                        </div>
+                    </div>
+
+                    <!-- Tax Liability This Month -->
+                    <div class="bg-white rounded-lg shadow p-5">
+                        <h3 class="text-sm font-semibold text-gray-800 mb-3">Tax Liability — This Month</h3>
+                        <div class="text-2xl font-bold text-gray-900 mb-4">{{ fmtCompact(totalTax) }}</div>
+
+                        <div class="space-y-3">
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-gray-500">CGST</span>
+                                    <span class="font-medium">{{ fmtCompact(taxThisMonth?.cgst || 0) }}</span>
+                                </div>
+                                <div class="w-full bg-gray-100 rounded-full h-2">
+                                    <div class="bg-blue-500 h-2 rounded-full transition-all" :style="`width:${taxPct(taxThisMonth?.cgst || 0)}%`"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-gray-500">SGST</span>
+                                    <span class="font-medium">{{ fmtCompact(taxThisMonth?.sgst || 0) }}</span>
+                                </div>
+                                <div class="w-full bg-gray-100 rounded-full h-2">
+                                    <div class="bg-green-500 h-2 rounded-full transition-all" :style="`width:${taxPct(taxThisMonth?.sgst || 0)}%`"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-xs mb-1">
+                                    <span class="text-gray-500">IGST</span>
+                                    <span class="font-medium">{{ fmtCompact(taxThisMonth?.igst || 0) }}</span>
+                                </div>
+                                <div class="w-full bg-gray-100 rounded-full h-2">
+                                    <div class="bg-orange-400 h-2 rounded-full transition-all" :style="`width:${taxPct(taxThisMonth?.igst || 0)}%`"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-3 pt-3 border-t text-xs text-gray-400">
+                            File GSTR-3B by 20th to pay this liability
+                        </div>
+                    </div>
+
                 </div>
 
                 <!-- Two-column: Recent Invoices + Top Customers -->

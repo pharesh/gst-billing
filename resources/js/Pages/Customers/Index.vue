@@ -60,6 +60,13 @@ function deleteCustomer(id) {
 function applySearch() {
     router.get(route('customers.index'), { search: search.value }, { preserveState: true });
 }
+
+function exportUrl() {
+    const params = new URLSearchParams();
+    if (search.value) params.set('search', search.value);
+    const qs = params.toString();
+    return route('customers.export') + (qs ? '?' + qs : '');
+}
 </script>
 
 <template>
@@ -68,7 +75,12 @@ function applySearch() {
         <template #header>
             <div class="flex justify-between items-center">
                 <h2 class="text-xl font-semibold text-gray-800">Customers</h2>
-                <button @click="openCreate" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">+ Add Customer</button>
+                <div class="flex gap-2">
+                    <a :href="exportUrl()" class="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50">
+                        ↓ Export CSV
+                    </a>
+                    <button @click="openCreate" class="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700">+ Add Customer</button>
+                </div>
             </div>
         </template>
 

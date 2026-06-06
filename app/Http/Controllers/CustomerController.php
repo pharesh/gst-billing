@@ -91,6 +91,40 @@ class CustomerController extends Controller
         ]);
     }
 
+    public function export(Request $request)
+    {
+        $customers = Customer::where('tenant_id', $request->user()->tenant_id)
+            ->when($request->search, fn ($q) => $q->where('name', 'like', "%{$request->search}%")
+                ->orWhere('gstin', 'like', "%{$request->search}%"))
+            ->orderBy('name')
+            ->get();
+
+        $filename = 'customers-' . now()->format('Y-m-d') . '.csv';
+
+        return response()->stream(function () use ($customers) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['Name', 'GSTIN', 'Type', 'Phone', 'Email', 'Address', 'City', 'State', 'State Code', 'Pincode']);
+            foreach ($customers as $c) {
+                fputcsv($handle, [
+                    $c->name,
+                    $c->gstin ?? '',
+                    strtoupper($c->customer_type),
+                    $c->phone ?? '',
+                    $c->email ?? '',
+                    $c->address ?? '',
+                    $c->city ?? '',
+                    $c->state ?? '',
+                    $c->state_code ?? '',
+                    $c->pincode ?? '',
+                ]);
+            }
+            fclose($handle);
+        }, 200, [
+            'Content-Type'        => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
+    }
+
     public function destroy(Request $request, Customer $customer)
     {
         abort_unless($customer->tenant_id === $request->user()->tenant_id, 403);

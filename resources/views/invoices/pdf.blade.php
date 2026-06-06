@@ -43,6 +43,9 @@
         .badge-paid { background: #d4edda; color: #155724; }
         .badge-unpaid { background: #f8d7da; color: #721c24; }
         .badge-partial { background: #fff3cd; color: #856404; }
+        .irn-block { background: #f0f7ff; border: 1px solid #b8d4f0; border-radius: 4px; padding: 8px 10px; margin-bottom: 10px; font-size: 9px; }
+        .irn-block .irn-label { font-weight: bold; color: #1a3a5c; font-size: 10px; margin-bottom: 4px; }
+        .irn-block .irn-val { font-family: monospace; color: #222; word-break: break-all; }
     </style>
 </head>
 <body>
@@ -230,6 +233,27 @@
                 </tr>
                 @endforeach
             </tbody>
+        </table>
+    </div>
+    @endif
+
+    {{-- e-Invoice IRN Block --}}
+    @if($invoice->irn && $invoice->irn_status !== 'cancelled')
+    <div class="irn-block">
+        <div class="irn-label">e-Invoice Details (IRN)</div>
+        <table style="width:100%;font-size:9px;border:none;">
+            <tr>
+                <td style="width:20%;color:#555;padding:1px 0;">IRN:</td>
+                <td class="irn-val">{{ $invoice->irn }}</td>
+            </tr>
+            <tr>
+                <td style="color:#555;padding:1px 0;">Ack No:</td>
+                <td class="irn-val">{{ $invoice->ack_no }}</td>
+            </tr>
+            <tr>
+                <td style="color:#555;padding:1px 0;">Ack Date:</td>
+                <td>{{ $invoice->ack_date }}</td>
+            </tr>
         </table>
     </div>
     @endif

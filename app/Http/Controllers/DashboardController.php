@@ -86,6 +86,57 @@ class DashboardController extends Controller
             ? round((($monthlyTotal - $lastMonthTotal) / $lastMonthTotal) * 100, 1)
             : null;
 
+        // Last 12 months revenue chart data
+        $monthlyChart = collect(range(11, 0))->map(function ($n) use ($base) {
+            $date  = now()->subMonths($n);
+            $start = $date->copy()->startOfMonth()->format('Y-m-d');
+            $end   = $date->copy()->endOfMonth()->format('Y-m-d');
+
+            $total = (clone $base())
+                ->where('invoice_date', '>=', $start)
+                ->where('invoice_date', '<=', $end)
+                ->sum('total_amount');
+
+            $cgst = (clone $base())
+                ->where('invoice_date', '>=', $start)
+                ->where('invoice_date', '<=', $end)
+                ->sum('cgst_amount');
+
+            $sgst = (clone $base())
+                ->where('invoice_date', '>=', $start)
+                ->where('invoice_date', '<=', $end)
+                ->sum('sgst_amount');
+
+            $igst = (clone $base())
+                ->where('invoice_date', '>=', $start)
+                ->where('invoice_date', '<=', $end)
+                ->sum('igst_amount');
+
+            return [
+                'label'  => $date->format('M y'),
+                'total'  => round($total, 2),
+                'cgst'   => round($cgst, 2),
+                'sgst'   => round($sgst, 2),
+                'igst'   => round($igst, 2),
+            ];
+        })->values();
+
+        // Tax liability totals (this month)
+        $taxThisMonth = [
+            'cgst' => (clone $base())
+                ->where('invoice_date', '>=', $monthStart)
+                ->where('invoice_date', '<=', $monthEnd)
+                ->sum('cgst_amount'),
+            'sgst' => (clone $base())
+                ->where('invoice_date', '>=', $monthStart)
+                ->where('invoice_date', '<=', $monthEnd)
+                ->sum('sgst_amount'),
+            'igst' => (clone $base())
+                ->where('invoice_date', '>=', $monthStart)
+                ->where('invoice_date', '<=', $monthEnd)
+                ->sum('igst_amount'),
+        ];
+
         return Inertia::render('Dashboard', [
             'stats' => [
                 'monthly_total'     => $monthlyTotal,
@@ -99,6 +150,8 @@ class DashboardController extends Controller
             'recentInvoices'  => (clone $base())->with('customer:id,name')->latest()->limit(5)->get(),
             'overdueInvoices' => $overdueInvoices,
             'topCustomers'    => $topCustomers,
+            'monthlyChart'    => $monthlyChart,
+            'taxThisMonth'    => $taxThisMonth,
         ]);
     }
 }

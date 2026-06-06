@@ -5,7 +5,10 @@ use App\Http\Controllers\Admin\AdminPlanController;
 use App\Http\Controllers\Admin\AdminTenantController;
 use App\Http\Controllers\Admin\SystemSettingsController;
 use App\Http\Controllers\BillingController;
+use App\Http\Controllers\PurchaseController;
+use App\Http\Controllers\QuotationController;
 use App\Http\Controllers\CreditNoteController;
+use App\Http\Controllers\DebitNoteController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\RecurringInvoiceController;
@@ -44,11 +47,19 @@ Route::middleware(['auth', 'verified', 'tenant'])->group(function () {
     Route::post('/invoices/{invoice}/whatsapp', [InvoiceController::class, 'sendWhatsApp'])->name('invoices.whatsapp');
     Route::post('/invoices/{invoice}/email', [InvoiceController::class, 'sendEmail'])->name('invoices.email');
     Route::post('/invoices/{invoice}/reminder', [InvoiceController::class, 'sendReminder'])->name('invoices.reminder');
+    Route::post('/invoices/{invoice}/payment-link', [InvoiceController::class, 'generatePaymentLink'])->name('invoices.payment-link');
+    Route::post('/invoices/{invoice}/payment-link/sync', [InvoiceController::class, 'syncPaymentLink'])->name('invoices.payment-link.sync');
+    Route::post('/invoices/{invoice}/irn', [InvoiceController::class, 'generateIRN'])->name('invoices.irn.generate');
+    Route::post('/invoices/{invoice}/irn/cancel', [InvoiceController::class, 'cancelIRN'])->name('invoices.irn.cancel');
+    Route::get('/invoices-export', [InvoiceController::class, 'export'])->name('invoices.export');
+    Route::post('/invoices/bulk-download', [InvoiceController::class, 'bulkDownload'])->name('invoices.bulk-download');
+    Route::post('/invoices/bulk-reminder', [InvoiceController::class, 'bulkReminder'])->name('invoices.bulk-reminder');
 
     // Customers
     Route::resource('customers', CustomerController::class)->except(['create', 'show', 'edit', 'store']);
     Route::post('/customers', [CustomerController::class, 'store'])->middleware('plan.limit:customer')->name('customers.store');
     Route::get('/customers/{customer}/statement', [CustomerController::class, 'statement'])->name('customers.statement');
+    Route::get('/customers-export', [CustomerController::class, 'export'])->name('customers.export');
 
     // Products
     Route::resource('products', ProductController::class)->except(['create', 'show', 'edit', 'store']);
@@ -61,15 +72,30 @@ Route::middleware(['auth', 'verified', 'tenant'])->group(function () {
     // Payments
     Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');
     Route::delete('/payments/{payment}', [PaymentController::class, 'destroy'])->name('payments.destroy');
+    Route::get('/payments-export', [PaymentController::class, 'export'])->name('payments.export');
+
+    // Purchases / Bills (for ITC tracking)
+    Route::resource('purchases', PurchaseController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
+    Route::post('/purchases/{purchase}/mark-paid', [PurchaseController::class, 'markPaid'])->name('purchases.mark-paid');
+
+    // Quotations / Proforma Invoices
+    Route::resource('quotations', QuotationController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
+    Route::post('/quotations/{quotation}/status', [QuotationController::class, 'updateStatus'])->name('quotations.status');
+    Route::post('/quotations/{quotation}/convert', [QuotationController::class, 'convert'])->name('quotations.convert');
+    Route::get('/quotations/{quotation}/download', [QuotationController::class, 'download'])->name('quotations.download');
 
     // GST Reports
     Route::get('/reports', [GSTReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/aging', [GSTReportController::class, 'aging'])->name('reports.aging');
     Route::get('/reports/gstr1', [GSTReportController::class, 'gstr1'])->name('reports.gstr1');
     Route::get('/reports/gstr3b', [GSTReportController::class, 'gstr3b'])->name('reports.gstr3b');
     Route::get('/reports/gstr1/download', [GSTReportController::class, 'downloadGSTR1'])->name('reports.gstr1.download');
 
     // Credit Notes
     Route::resource('credit-notes', CreditNoteController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
+
+    // Debit Notes (purchase returns)
+    Route::resource('debit-notes', DebitNoteController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
 
     // Recurring Invoices
     Route::resource('recurring-invoices', RecurringInvoiceController::class)->only(['index', 'create', 'store', 'destroy']);
