@@ -21,6 +21,11 @@ class PasswordController extends Controller
             'password' => Hash::make($validated['password']),
         ]);
 
+        // Revoke all tokens except the current one so other devices are logged out
+        $request->user()->tokens()
+            ->where('id', '!=', $request->user()->currentAccessToken()->id)
+            ->delete();
+
         return response()->json(['message' => 'Password updated successfully.']);
     }
 }

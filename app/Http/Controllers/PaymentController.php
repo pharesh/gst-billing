@@ -13,6 +13,23 @@ class PaymentController extends Controller
 {
     public function __construct(private NotificationService $notifications) {}
 
+    public function index(Request $request): JsonResponse
+    {
+        $payments = Payment::with(['invoice.customer'])
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->when($request->date_from, fn ($q) => $q->where('payment_date', '>=', $request->date_from))
+            ->when($request->date_to,   fn ($q) => $q->where('payment_date', '<=', $request->date_to))
+            ->when($request->method,    fn ($q) => $q->where('payment_method', $request->method))
+            ->latest('payment_date')
+            ->paginate(20)
+            ->withQueryString();
+
+        return response()->json([
+            'payments' => $payments,
+            'filters'  => $request->only('date_from', 'date_to', 'method'),
+        ]);
+    }
+
     public function store(Request $request, Invoice $invoice): JsonResponse
     {
         abort_unless($invoice->tenant_id === $request->user()->tenant_id, 403);

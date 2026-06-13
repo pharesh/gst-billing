@@ -46,6 +46,13 @@ class SupplierController extends Controller
         return response()->json(['message' => 'Supplier added.', 'supplier' => $supplier], 201);
     }
 
+    public function show(Request $request, Supplier $supplier): JsonResponse
+    {
+        abort_unless($supplier->tenant_id === $request->user()->tenant_id, 403);
+
+        return response()->json(['supplier' => $supplier]);
+    }
+
     public function update(Request $request, Supplier $supplier): JsonResponse
     {
         abort_unless($supplier->tenant_id === $request->user()->tenant_id, 403);

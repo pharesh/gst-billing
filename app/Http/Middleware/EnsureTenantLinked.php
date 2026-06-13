@@ -11,13 +11,10 @@ class EnsureTenantLinked
     public function handle(Request $request, Closure $next): Response
     {
         if ($request->user() && ! $request->user()->tenant_id) {
-            // Old account with no tenant — log out and send to register
-            auth()->logout();
-            $request->session()->invalidate();
-            $request->session()->regenerateToken();
-
-            return redirect()->route('register')
-                ->withErrors(['email' => 'Please create a new account to set up your business.']);
+            return response()->json(
+                ['message' => 'Account is not linked to a business. Please register again.'],
+                403
+            );
         }
 
         return $next($request);

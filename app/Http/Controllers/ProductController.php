@@ -40,6 +40,13 @@ class ProductController extends Controller
         return response()->json(['message' => 'Product added.', 'product' => $product], 201);
     }
 
+    public function show(Request $request, Product $product): JsonResponse
+    {
+        abort_unless($product->tenant_id === $request->user()->tenant_id, 403);
+
+        return response()->json(['product' => $product]);
+    }
+
     public function update(Request $request, Product $product): JsonResponse
     {
         abort_unless($product->tenant_id === $request->user()->tenant_id, 403);

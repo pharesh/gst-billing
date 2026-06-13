@@ -30,6 +30,9 @@ class NewPasswordController extends Controller
                     'remember_token' => Str::random(60),
                 ])->save();
 
+                // Revoke all existing tokens so stolen tokens cannot be reused
+                $user->tokens()->delete();
+
                 event(new PasswordReset($user));
             }
         );

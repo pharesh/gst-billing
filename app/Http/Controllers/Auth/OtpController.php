@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
 class OtpController extends Controller
@@ -28,6 +29,9 @@ class OtpController extends Controller
 
         $user->update(['otp_code' => null, 'otp_expires_at' => null, 'otp_verified' => true]);
 
+        // Revoke any stale 'web' tokens from previous OTP verification attempts
+        $user->tokens()->where('name', 'web')->delete();
+
         $token = $user->createToken('web')->plainTextToken;
 
         return response()->json(['token' => $token, 'user' => $user]);
@@ -38,6 +42,17 @@ class OtpController extends Controller
         $request->validate([
             'user_id' => 'required',
         ]);
+
+        $throttleKey = 'otp-resend:'.$request->input('user_id').'|'.$request->ip();
+
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            $seconds = RateLimiter::availableIn($throttleKey);
+            return response()->json([
+                'message' => "Too many resend attempts. Please wait {$seconds} seconds.",
+            ], 429);
+        }
+
+        RateLimiter::hit($throttleKey, 60);
 
         $user = User::find($request->user_id);
 

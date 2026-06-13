@@ -45,6 +45,13 @@ class CustomerController extends Controller
         return response()->json(['message' => 'Customer added.', 'customer' => $customer], 201);
     }
 
+    public function show(Request $request, Customer $customer): JsonResponse
+    {
+        abort_unless($customer->tenant_id === $request->user()->tenant_id, 403);
+
+        return response()->json(['customer' => $customer]);
+    }
+
     public function update(Request $request, Customer $customer): JsonResponse
     {
         abort_unless($customer->tenant_id === $request->user()->tenant_id, 403);
