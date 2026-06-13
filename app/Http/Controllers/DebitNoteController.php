@@ -7,27 +7,28 @@ use App\Models\DebitNoteItem;
 use App\Models\PurchaseInvoice;
 use App\Models\Supplier;
 use App\Services\GSTCalculationService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
 
 class DebitNoteController extends Controller
 {
     public function __construct(private GSTCalculationService $gst) {}
 
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $tenant = $request->user()->tenant;
 
         $notes = DebitNote::with(['supplier:id,name', 'purchaseInvoice:id,bill_number'])
             ->where('tenant_id', $tenant->id)
-            ->when($request->search, fn ($q) => $q->where('debit_note_number', 'like', "%{$request->search}%"))
+            ->when($request->search,      fn ($q) => $q->where('debit_note_number', 'like', "%{$request->search}%"))
             ->when($request->supplier_id, fn ($q) => $q->where('supplier_id', $request->supplier_id))
             ->orderBy('debit_note_date', 'desc')
             ->paginate(20)
             ->withQueryString();
 
-        return Inertia::render('DebitNotes/Index', [
+        return response()->json([
             'notes'     => $notes,
             'suppliers' => Supplier::where('tenant_id', $tenant->id)->orderBy('name')->get(['id', 'name']),
             'filters'   => $request->only(['search', 'supplier_id']),
@@ -38,24 +39,21 @@ class DebitNoteController extends Controller
         ]);
     }
 
-    public function create(Request $request)
+    public function create(Request $request): JsonResponse
     {
-        $tenant = $request->user()->tenant;
-
+        $tenant     = $request->user()->tenant;
         $purchaseId = $request->purchase_invoice_id;
         $purchase   = $purchaseId
-            ? PurchaseInvoice::with(['supplier', 'items'])
-                ->where('tenant_id', $tenant->id)
-                ->findOrFail($purchaseId)
+            ? PurchaseInvoice::with(['supplier', 'items'])->where('tenant_id', $tenant->id)->findOrFail($purchaseId)
             : null;
 
-        return Inertia::render('DebitNotes/Create', [
+        return response()->json([
             'suppliers'       => Supplier::where('tenant_id', $tenant->id)->orderBy('name')->get(['id', 'name', 'gstin']),
             'prefillPurchase' => $purchase,
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'supplier_id'          => 'required|integer',
@@ -74,18 +72,11 @@ class DebitNoteController extends Controller
         ]);
 
         $tenant = $request->user()->tenant;
+        $dn     = null;
 
-        DB::transaction(function () use ($validated, $tenant) {
-            $number = $tenant->nextDebitNoteNumber();
-
+        DB::transaction(function () use ($validated, $tenant, &$dn) {
             $calculatedItems = collect($validated['items'])->map(function ($item, $index) use ($validated) {
-                $calc = $this->gst->calculateItem(
-                    $item['price'],
-                    $item['quantity'],
-                    $item['gst_rate'],
-                    $validated['supply_type'],
-                    0
-                );
+                $calc = $this->gst->calculateItem($item['price'], $item['quantity'], $item['gst_rate'], $validated['supply_type'], 0);
                 return array_merge($item, $calc, ['sort_order' => $index]);
             });
 
@@ -95,7 +86,7 @@ class DebitNoteController extends Controller
                 'tenant_id'           => $tenant->id,
                 'supplier_id'         => $validated['supplier_id'],
                 'purchase_invoice_id' => $validated['purchase_invoice_id'] ?? null,
-                'debit_note_number'   => $number,
+                'debit_note_number'   => $tenant->nextDebitNoteNumber(),
                 'debit_note_date'     => $validated['debit_note_date'],
                 'supply_type'         => $validated['supply_type'],
                 'reason'              => $validated['reason'] ?? null,
@@ -108,29 +99,26 @@ class DebitNoteController extends Controller
             }
         });
 
-        return redirect()->route('debit-notes.index')->with('success', 'Debit Note created.');
+        return response()->json(['message' => 'Debit Note created.', 'debitNote' => $dn], 201);
     }
 
-    public function show(Request $request, DebitNote $debitNote)
+    public function show(Request $request, DebitNote $debitNote): JsonResponse
     {
         abort_unless($debitNote->tenant_id === $request->user()->tenant_id, 403);
-
         $debitNote->load(['supplier', 'purchaseInvoice', 'items']);
 
-        return Inertia::render('DebitNotes/Show', [
+        return response()->json([
             'debitNote'     => $debitNote,
             'gstGroups'     => $this->gst->groupByGSTRate($debitNote->items->map(fn ($i) => $i->toArray())->toArray()),
             'amountInWords' => $this->gst->amountInWords($debitNote->total_amount),
         ]);
     }
 
-    public function destroy(Request $request, DebitNote $debitNote)
+    public function destroy(Request $request, DebitNote $debitNote): Response
     {
         abort_unless($debitNote->tenant_id === $request->user()->tenant_id, 403);
-
         $debitNote->items()->delete();
         $debitNote->delete();
-
-        return redirect()->route('debit-notes.index')->with('success', 'Debit Note deleted.');
+        return response()->noContent();
     }
 }

@@ -7,67 +7,62 @@ use App\Models\CreditNoteItem;
 use App\Models\Customer;
 use App\Models\Invoice;
 use App\Services\GSTCalculationService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
 
 class CreditNoteController extends Controller
 {
     public function __construct(private GSTCalculationService $gst) {}
 
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
-        $tenant = $request->user()->tenant;
-
         $notes = CreditNote::with('customer', 'invoice')
-            ->where('tenant_id', $tenant->id)
+            ->where('tenant_id', $request->user()->tenant_id)
             ->when($request->search, fn ($q) => $q->where('credit_note_number', 'like', "%{$request->search}%")
                 ->orWhereHas('customer', fn ($c) => $c->where('name', 'like', "%{$request->search}%")))
             ->latest('credit_note_date')
             ->paginate(20)
             ->withQueryString();
 
-        return Inertia::render('CreditNotes/Index', [
+        return response()->json([
             'creditNotes' => $notes,
             'filters'     => $request->only('search'),
         ]);
     }
 
-    public function create(Request $request)
+    public function create(Request $request): JsonResponse
     {
-        $tenant = $request->user()->tenant;
+        $tenant    = $request->user()->tenant;
         $invoiceId = $request->query('invoice_id');
-        $invoice = null;
+        $invoice   = $invoiceId
+            ? Invoice::with('items', 'customer')->where('tenant_id', $tenant->id)->find($invoiceId)
+            : null;
 
-        if ($invoiceId) {
-            $invoice = Invoice::with('items', 'customer')
-                ->where('tenant_id', $tenant->id)
-                ->find($invoiceId);
-        }
-
-        return Inertia::render('CreditNotes/Create', [
+        return response()->json([
             'customers' => Customer::where('tenant_id', $tenant->id)->orderBy('name')->get(['id', 'name', 'gstin', 'state_code']),
             'invoice'   => $invoice,
             'tenant'    => $tenant->only(['state_code', 'gstin', 'invoice_prefix']),
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'customer_id'         => 'required|exists:customers,id',
-            'invoice_id'          => 'nullable|exists:invoices,id',
-            'credit_note_date'    => 'required|date',
-            'reason'              => 'required|string|max:500',
-            'supply_type'         => 'required|in:intrastate,interstate',
-            'notes'               => 'nullable|string|max:500',
-            'items'               => 'required|array|min:1',
-            'items.*.description' => 'required|string',
-            'items.*.hsn_sac_code'=> 'nullable|string',
-            'items.*.unit'        => 'required|string',
-            'items.*.quantity'    => 'required|numeric|min:0.001',
-            'items.*.price'       => 'required|numeric|min:0',
-            'items.*.gst_rate'    => 'required|numeric|min:0|max:28',
+            'customer_id'          => 'required|exists:customers,id',
+            'invoice_id'           => 'nullable|exists:invoices,id',
+            'credit_note_date'     => 'required|date',
+            'reason'               => 'required|string|max:500',
+            'supply_type'          => 'required|in:intrastate,interstate',
+            'notes'                => 'nullable|string|max:500',
+            'items'                => 'required|array|min:1',
+            'items.*.description'  => 'required|string',
+            'items.*.hsn_sac_code' => 'nullable|string',
+            'items.*.unit'         => 'required|string',
+            'items.*.quantity'     => 'required|numeric|min:0.001',
+            'items.*.price'        => 'required|numeric|min:0',
+            'items.*.gst_rate'     => 'required|numeric|min:0|max:28',
         ]);
 
         $tenant = $request->user()->tenant;
@@ -77,16 +72,11 @@ class CreditNoteController extends Controller
             403
         );
 
-        DB::transaction(function () use ($validated, $tenant) {
-            $number = $tenant->nextCreditNoteNumber();
+        $note = null;
 
+        DB::transaction(function () use ($validated, $tenant, &$note) {
             $calculatedItems = collect($validated['items'])->map(function ($item, $index) use ($validated) {
-                $calc = $this->gst->calculateItem(
-                    $item['price'],
-                    $item['quantity'],
-                    $item['gst_rate'],
-                    $validated['supply_type']
-                );
+                $calc = $this->gst->calculateItem($item['price'], $item['quantity'], $item['gst_rate'], $validated['supply_type']);
                 return array_merge($item, [
                     'taxable_amount' => $calc['taxable_amount'],
                     'cgst_amount'    => $calc['cgst_amount'],
@@ -103,7 +93,7 @@ class CreditNoteController extends Controller
                 'tenant_id'          => $tenant->id,
                 'customer_id'        => $validated['customer_id'],
                 'invoice_id'         => $validated['invoice_id'] ?? null,
-                'credit_note_number' => $number,
+                'credit_note_number' => $tenant->nextCreditNoteNumber(),
                 'credit_note_date'   => $validated['credit_note_date'],
                 'reason'             => $validated['reason'],
                 'supply_type'        => $validated['supply_type'],
@@ -121,25 +111,25 @@ class CreditNoteController extends Controller
             }
         });
 
-        return redirect()->route('credit-notes.index')->with('success', 'Credit note issued successfully.');
+        return response()->json(['message' => 'Credit note issued successfully.', 'creditNote' => $note], 201);
     }
 
-    public function show(Request $request, CreditNote $creditNote)
+    public function show(Request $request, CreditNote $creditNote): JsonResponse
     {
         $this->authorize($request, $creditNote);
         $creditNote->load(['customer', 'items', 'invoice', 'tenant']);
 
-        return Inertia::render('CreditNotes/Show', [
+        return response()->json([
             'creditNote' => $creditNote,
             'gstGroups'  => $this->gst->groupByGSTRate($creditNote->items->map(fn ($i) => $i->toArray())->toArray()),
         ]);
     }
 
-    public function destroy(Request $request, CreditNote $creditNote)
+    public function destroy(Request $request, CreditNote $creditNote): Response
     {
         $this->authorize($request, $creditNote);
         $creditNote->delete();
-        return redirect()->route('credit-notes.index')->with('success', 'Credit note deleted.');
+        return response()->noContent();
     }
 
     private function authorize(Request $request, CreditNote $creditNote): void

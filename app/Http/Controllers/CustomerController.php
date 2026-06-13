@@ -4,13 +4,13 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\Invoice;
-use App\Models\Payment;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use Illuminate\Http\Response;
 
 class CustomerController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $customers = Customer::where('tenant_id', $request->user()->tenant_id)
             ->when($request->search, fn ($q) => $q->where('name', 'like', "%{$request->search}%")
@@ -19,55 +19,55 @@ class CustomerController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return Inertia::render('Customers/Index', [
+        return response()->json([
             'customers' => $customers,
-            'filters' => $request->only('search'),
+            'filters'   => $request->only('search'),
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'gstin' => ['nullable', 'string', 'size:15', 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/'],
+            'name'          => 'required|string|max:255',
+            'gstin'         => ['nullable', 'string', 'size:15', 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/'],
             'customer_type' => 'required|in:b2b,b2c',
-            'address' => 'nullable|string',
-            'city' => 'nullable|string|max:100',
-            'state' => 'nullable|string|max:100',
-            'state_code' => 'nullable|string|max:2',
-            'pincode' => 'nullable|string|max:10',
-            'phone' => 'nullable|string|max:15',
-            'email' => 'nullable|email|max:255',
+            'address'       => 'nullable|string',
+            'city'          => 'nullable|string|max:100',
+            'state'         => 'nullable|string|max:100',
+            'state_code'    => 'nullable|string|max:2',
+            'pincode'       => 'nullable|string|max:10',
+            'phone'         => 'nullable|string|max:15',
+            'email'         => 'nullable|email|max:255',
         ]);
 
-        Customer::create([...$validated, 'tenant_id' => $request->user()->tenant_id]);
+        $customer = Customer::create([...$validated, 'tenant_id' => $request->user()->tenant_id]);
 
-        return back()->with('success', 'Customer added.');
+        return response()->json(['message' => 'Customer added.', 'customer' => $customer], 201);
     }
 
-    public function update(Request $request, Customer $customer)
+    public function update(Request $request, Customer $customer): JsonResponse
     {
         abort_unless($customer->tenant_id === $request->user()->tenant_id, 403);
 
         $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'gstin' => ['nullable', 'string', 'size:15', 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/'],
+            'name'          => 'required|string|max:255',
+            'gstin'         => ['nullable', 'string', 'size:15', 'regex:/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/'],
             'customer_type' => 'required|in:b2b,b2c',
-            'address' => 'nullable|string',
-            'city' => 'nullable|string|max:100',
-            'state' => 'nullable|string|max:100',
-            'state_code' => 'nullable|string|max:2',
-            'pincode' => 'nullable|string|max:10',
-            'phone' => 'nullable|string|max:15',
-            'email' => 'nullable|email|max:255',
+            'address'       => 'nullable|string',
+            'city'          => 'nullable|string|max:100',
+            'state'         => 'nullable|string|max:100',
+            'state_code'    => 'nullable|string|max:2',
+            'pincode'       => 'nullable|string|max:10',
+            'phone'         => 'nullable|string|max:15',
+            'email'         => 'nullable|email|max:255',
         ]);
 
         $customer->update($validated);
 
-        return back()->with('success', 'Customer updated.');
+        return response()->json(['message' => 'Customer updated.', 'customer' => $customer]);
     }
 
-    public function statement(Request $request, Customer $customer)
+    public function statement(Request $request, Customer $customer): JsonResponse
     {
         abort_unless($customer->tenant_id === $request->user()->tenant_id, 403);
 
@@ -76,14 +76,14 @@ class CustomerController extends Controller
             ->orderBy('invoice_date')
             ->get();
 
-        $totalBilled   = $invoices->sum('total_amount');
-        $totalPaid     = $invoices->sum('amount_paid');
-        $totalBalance  = $totalBilled - $totalPaid;
+        $totalBilled  = $invoices->sum('total_amount');
+        $totalPaid    = $invoices->sum('amount_paid');
+        $totalBalance = $totalBilled - $totalPaid;
 
-        return Inertia::render('Customers/Statement', [
-            'customer'     => $customer,
-            'invoices'     => $invoices,
-            'summary'      => [
+        return response()->json([
+            'customer' => $customer,
+            'invoices' => $invoices,
+            'summary'  => [
                 'total_billed'  => $totalBilled,
                 'total_paid'    => $totalPaid,
                 'total_balance' => $totalBalance,
@@ -99,23 +99,16 @@ class CustomerController extends Controller
             ->orderBy('name')
             ->get();
 
-        $filename = 'customers-' . now()->format('Y-m-d') . '.csv';
+        $filename = 'customers-'.now()->format('Y-m-d').'.csv';
 
         return response()->stream(function () use ($customers) {
             $handle = fopen('php://output', 'w');
             fputcsv($handle, ['Name', 'GSTIN', 'Type', 'Phone', 'Email', 'Address', 'City', 'State', 'State Code', 'Pincode']);
             foreach ($customers as $c) {
                 fputcsv($handle, [
-                    $c->name,
-                    $c->gstin ?? '',
-                    strtoupper($c->customer_type),
-                    $c->phone ?? '',
-                    $c->email ?? '',
-                    $c->address ?? '',
-                    $c->city ?? '',
-                    $c->state ?? '',
-                    $c->state_code ?? '',
-                    $c->pincode ?? '',
+                    $c->name, $c->gstin ?? '', strtoupper($c->customer_type),
+                    $c->phone ?? '', $c->email ?? '', $c->address ?? '',
+                    $c->city ?? '', $c->state ?? '', $c->state_code ?? '', $c->pincode ?? '',
                 ]);
             }
             fclose($handle);
@@ -125,10 +118,10 @@ class CustomerController extends Controller
         ]);
     }
 
-    public function destroy(Request $request, Customer $customer)
+    public function destroy(Request $request, Customer $customer): Response
     {
         abort_unless($customer->tenant_id === $request->user()->tenant_id, 403);
         $customer->delete();
-        return back()->with('success', 'Customer deleted.');
+        return response()->noContent();
     }
 }

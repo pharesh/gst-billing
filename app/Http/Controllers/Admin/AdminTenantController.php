@@ -6,17 +6,17 @@ use App\Http\Controllers\Controller;
 use App\Models\Plan;
 use App\Models\Tenant;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
-use Inertia\Inertia;
 
 class AdminTenantController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
-        // withCount() is not supported by MongoDB; load relationships and count in PHP
         $tenants = Tenant::with(['plan', 'activeSubscription.plan', 'users', 'invoices', 'customers'])
             ->when($request->search, fn ($q) => $q->where('name', 'like', "%{$request->search}%")
                 ->orWhere('email', 'like', "%{$request->search}%"))
@@ -25,23 +25,21 @@ class AdminTenantController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        // Append _count attributes to mimic withCount() output
         $tenants->each(function ($tenant) {
             $tenant->invoices_count  = $tenant->invoices->count();
             $tenant->customers_count = $tenant->customers->count();
             $tenant->users_count     = $tenant->users->count();
-            // Unset loaded collections to keep payload size manageable
             unset($tenant->invoices, $tenant->customers);
         });
 
-        return Inertia::render('Admin/Tenants/Index', [
+        return response()->json([
             'tenants' => $tenants,
             'plans'   => Plan::orderBy('sort_order')->get(['id', 'name', 'slug']),
             'filters' => $request->only(['search', 'plan']),
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $request->validate([
             'company_name'   => 'required|string|max:255',
@@ -56,12 +54,12 @@ class AdminTenantController extends Controller
 
         DB::transaction(function () use ($request) {
             $tenant = Tenant::create([
-                'name'             => $request->company_name,
-                'gstin'            => $request->gstin ? strtoupper($request->gstin) : null,
-                'state'            => $request->state,
-                'invoice_prefix'   => strtoupper($request->invoice_prefix ?? 'INV'),
-                'subscription_plan'=> 'free',
-                'plan_id'          => $request->plan_id,
+                'name'              => $request->company_name,
+                'gstin'             => $request->gstin ? strtoupper($request->gstin) : null,
+                'state'             => $request->state,
+                'invoice_prefix'    => strtoupper($request->invoice_prefix ?? 'INV'),
+                'subscription_plan' => 'free',
+                'plan_id'           => $request->plan_id,
             ]);
 
             User::create([
@@ -82,36 +80,32 @@ class AdminTenantController extends Controller
             }
         });
 
-        return redirect()->route('admin.tenants.index')->with('success', "Tenant '{$request->company_name}' created successfully.");
+        return response()->json(['message' => "Tenant '{$request->company_name}' created successfully."], 201);
     }
 
-    public function show(Tenant $tenant)
+    public function show(Tenant $tenant): JsonResponse
     {
         $tenant->load(['plan', 'users', 'subscriptions.plan']);
-        // loadCount() is not supported by MongoDB; count via relationship queries
-        $invoiceCount  = $tenant->invoices()->count();
-        $customerCount = $tenant->customers()->count();
 
-        return Inertia::render('Admin/Tenants/Show', [
+        return response()->json([
             'tenant' => $tenant,
             'plans'  => Plan::orderBy('sort_order')->get(),
             'stats'  => [
-                'total_revenue'   => $tenant->payments()->sum('amount'),
-                'invoice_count'   => $invoiceCount,
-                'customer_count'  => $customerCount,
-                'monthly_invoices'=> $tenant->monthly_invoice_count,
+                'total_revenue'    => $tenant->payments()->sum('amount'),
+                'invoice_count'    => $tenant->invoices()->count(),
+                'customer_count'   => $tenant->customers()->count(),
+                'monthly_invoices' => $tenant->monthly_invoice_count,
             ],
         ]);
     }
 
-    public function assignPlan(Request $request, Tenant $tenant)
+    public function assignPlan(Request $request, Tenant $tenant): JsonResponse
     {
         $request->validate(['plan_id' => 'required|exists:plans,id']);
 
         $plan = Plan::findOrFail($request->plan_id);
         $tenant->update(['plan_id' => $plan->id]);
 
-        // Create subscription record
         $tenant->subscriptions()->create([
             'plan_id'   => $plan->id,
             'status'    => 'active',
@@ -119,10 +113,10 @@ class AdminTenantController extends Controller
             'ends_at'   => now()->addMonth(),
         ]);
 
-        return back()->with('success', "Plan changed to {$plan->name}.");
+        return response()->json(['message' => "Plan changed to {$plan->name}."]);
     }
 
-    public function update(Request $request, Tenant $tenant)
+    public function update(Request $request, Tenant $tenant): JsonResponse
     {
         $ownerUser = $tenant->users()->where('role', 'owner')->first();
 
@@ -131,8 +125,6 @@ class AdminTenantController extends Controller
             'owner_name'     => 'required|string|max:255',
             'email'          => [
                 'required', 'email',
-                // MongoDB stores integer PKs in 'id' field; use where() instead of ignore()
-                // which resolves to _id (the ObjectId) and would not match
                 $ownerUser
                     ? Rule::unique('users', 'email')->where(fn ($q) => $q->where('id', '!=', $ownerUser->id))
                     : Rule::unique('users', 'email'),
@@ -151,29 +143,26 @@ class AdminTenantController extends Controller
         ]);
 
         if ($ownerUser) {
-            $ownerData = [
-                'name'  => $request->owner_name,
-                'email' => $request->email,
-            ];
+            $ownerData = ['name' => $request->owner_name, 'email' => $request->email];
             if ($request->filled('new_password')) {
                 $ownerData['password'] = Hash::make($request->new_password);
             }
             $ownerUser->update($ownerData);
         }
 
-        return back()->with('success', "Tenant '{$tenant->name}' updated successfully.");
+        return response()->json(['message' => "Tenant '{$tenant->name}' updated successfully."]);
     }
 
-    public function toggleSuspend(Tenant $tenant)
+    public function toggleSuspend(Tenant $tenant): JsonResponse
     {
-        $tenant->update(['is_suspended' => !$tenant->is_suspended]);
+        $tenant->update(['is_suspended' => ! $tenant->is_suspended]);
         $status = $tenant->is_suspended ? 'suspended' : 'reactivated';
-        return back()->with('success', "Tenant {$status} successfully.");
+        return response()->json(['message' => "Tenant {$status} successfully."]);
     }
 
-    public function destroy(Tenant $tenant)
+    public function destroy(Tenant $tenant): Response
     {
         $tenant->delete();
-        return redirect()->route('admin.tenants.index')->with('success', 'Tenant deleted.');
+        return response()->noContent();
     }
 }

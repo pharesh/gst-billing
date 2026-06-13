@@ -2,21 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
-use Inertia\Response;
 
 class SettingsController extends Controller
 {
-    public function edit(Request $request): Response
+    public function show(Request $request): JsonResponse
     {
-        return Inertia::render('Settings/Index', [
-            'tenant' => $request->user()->tenant,
-        ]);
+        return response()->json(['tenant' => $request->user()->tenant]);
     }
 
-    public function update(Request $request): RedirectResponse
+    public function update(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'name'           => 'required|string|max:255',
@@ -38,6 +34,6 @@ class SettingsController extends Controller
 
         $request->user()->tenant->update($validated);
 
-        return back()->with('success', 'Business settings updated.');
+        return response()->json(['message' => 'Business settings updated.', 'tenant' => $request->user()->tenant->fresh()]);
     }
 }

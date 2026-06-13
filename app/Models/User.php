@@ -6,13 +6,14 @@ use App\Traits\HasIntegerPrimaryKey;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Laravel\Sanctum\HasApiTokens;
 use MongoDB\Laravel\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, HasIntegerPrimaryKey;
+    use HasFactory, Notifiable, HasApiTokens, HasIntegerPrimaryKey;
 
     protected $fillable = [
         'tenant_id', 'name', 'email', 'password', 'role',

@@ -4,25 +4,21 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Plan;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use Illuminate\Http\Response;
 
 class AdminPlanController extends Controller
 {
-    public function index()
+    public function index(): JsonResponse
     {
-        // withCount() is not supported by MongoDB; load tenants and count in PHP
         $plans = Plan::orderBy('sort_order')->get();
-        $plans->each(function ($plan) {
-            $plan->tenants_count = $plan->tenants()->count();
-        });
+        $plans->each(fn ($plan) => $plan->tenants_count = $plan->tenants()->count());
 
-        return Inertia::render('Admin/Plans/Index', [
-            'plans' => $plans,
-        ]);
+        return response()->json(['plans' => $plans]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'name'             => 'required|string|max:100',
@@ -39,11 +35,12 @@ class AdminPlanController extends Controller
             'sort_order'       => 'integer',
         ]);
 
-        Plan::create($validated);
-        return back()->with('success', 'Plan created.');
+        $plan = Plan::create($validated);
+
+        return response()->json(['message' => 'Plan created.', 'plan' => $plan], 201);
     }
 
-    public function update(Request $request, Plan $plan)
+    public function update(Request $request, Plan $plan): JsonResponse
     {
         $validated = $request->validate([
             'name'             => 'required|string|max:100',
@@ -61,15 +58,18 @@ class AdminPlanController extends Controller
         ]);
 
         $plan->update($validated);
-        return back()->with('success', 'Plan updated.');
+
+        return response()->json(['message' => 'Plan updated.', 'plan' => $plan]);
     }
 
-    public function destroy(Plan $plan)
+    public function destroy(Plan $plan): JsonResponse|Response
     {
         if ($plan->tenants()->count() > 0) {
-            return back()->withErrors(['plan' => 'Cannot delete plan with active tenants.']);
+            return response()->json(['errors' => ['plan' => ['Cannot delete plan with active tenants.']]], 422);
         }
+
         $plan->delete();
-        return back()->with('success', 'Plan deleted.');
+
+        return response()->noContent();
     }
 }

@@ -20,7 +20,7 @@ class CheckPlanLimits
         };
 
         if (!$can) {
-            $plan = $tenant->currentPlan();
+            $plan    = $tenant->currentPlan();
             $message = match ($resource) {
                 'invoice'  => "Invoice limit reached ({$plan->invoice_limit}/month). Upgrade your plan to create more invoices.",
                 'customer' => "Customer limit reached ({$plan->customer_limit}). Upgrade your plan to add more customers.",
@@ -28,11 +28,7 @@ class CheckPlanLimits
                 default    => 'Plan limit reached. Please upgrade your plan.',
             };
 
-            if ($request->expectsJson() || $request->inertia()) {
-                return back()->withErrors(['plan_limit' => $message]);
-            }
-
-            return back()->withErrors(['plan_limit' => $message]);
+            return response()->json(['errors' => ['plan_limit' => [$message]]], 422);
         }
 
         return $next($request);

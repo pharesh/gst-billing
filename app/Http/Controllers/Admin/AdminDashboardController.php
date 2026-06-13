@@ -5,23 +5,20 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\Subscription;
 use App\Models\Tenant;
-use Illuminate\Http\Request;
-use Inertia\Inertia;
+use Illuminate\Http\JsonResponse;
 
 class AdminDashboardController extends Controller
 {
-    public function index()
+    public function index(): JsonResponse
     {
         $totalTenants = Tenant::count();
         $activeSubs   = Subscription::where('status', 'active')->count();
 
-        // MongoDB-compatible: compute MRR in PHP instead of JOIN
         $mrr = Subscription::where('status', 'active')
             ->with('plan:id,price_monthly')
             ->get()
             ->sum(fn ($s) => $s->plan?->price_monthly ?? 0);
 
-        // MongoDB stores dates as strings; use range query instead of whereMonth
         $newThisMonth = Tenant::where('created_at', '>=', now()->startOfMonth()->toDateTimeString())
             ->where('created_at', '<=', now()->endOfMonth()->toDateTimeString())
             ->count();
@@ -36,7 +33,7 @@ class AdminDashboardController extends Controller
             ->limit(10)
             ->get();
 
-        return Inertia::render('Admin/Dashboard', [
+        return response()->json([
             'stats' => [
                 'total_tenants'  => $totalTenants,
                 'active_subs'    => $activeSubs,

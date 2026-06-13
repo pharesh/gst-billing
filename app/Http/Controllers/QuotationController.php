@@ -10,15 +10,16 @@ use App\Models\Quotation;
 use App\Models\QuotationItem;
 use App\Services\GSTCalculationService;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
 
 class QuotationController extends Controller
 {
     public function __construct(private GSTCalculationService $gst) {}
 
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $tenant = $request->user()->tenant;
 
@@ -31,60 +32,53 @@ class QuotationController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return Inertia::render('Quotations/Index', [
+        return response()->json([
             'quotations' => $quotations,
             'filters'    => $request->only(['search', 'status']),
         ]);
     }
 
-    public function create(Request $request)
+    public function create(Request $request): JsonResponse
     {
         $tenant = $request->user()->tenant;
 
-        return Inertia::render('Quotations/Create', [
+        return response()->json([
             'customers' => Customer::where('tenant_id', $tenant->id)->get(['id', 'name', 'gstin', 'state_code', 'customer_type']),
             'products'  => Product::where('tenant_id', $tenant->id)->active()->get(['id', 'name', 'price', 'gst_rate', 'unit', 'hsn_sac_code']),
             'tenant'    => $tenant->only(['state_code', 'gstin', 'invoice_prefix']),
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'customer_id'                => 'required|exists:customers,id',
-            'quotation_date'             => 'required|date',
-            'valid_until'                => 'nullable|date|after_or_equal:quotation_date',
-            'invoice_type'               => 'required|in:b2b,b2c,export',
-            'supply_type'                => 'required|in:intrastate,interstate',
-            'notes'                      => 'nullable|string|max:500',
-            'terms'                      => 'nullable|string|max:500',
-            'items'                      => 'required|array|min:1',
-            'items.*.description'        => 'required|string',
-            'items.*.product_id'         => 'nullable|exists:products,id',
-            'items.*.hsn_sac_code'       => 'nullable|string',
-            'items.*.unit'               => 'required|string',
-            'items.*.quantity'           => 'required|numeric|min:0.001',
-            'items.*.price'              => 'required|numeric|min:0',
-            'items.*.gst_rate'           => 'required|numeric|min:0|max:28',
-            'items.*.discount_percent'   => 'nullable|numeric|min:0|max:100',
+            'customer_id'              => 'required|exists:customers,id',
+            'quotation_date'           => 'required|date',
+            'valid_until'              => 'nullable|date|after_or_equal:quotation_date',
+            'invoice_type'             => 'required|in:b2b,b2c,export',
+            'supply_type'              => 'required|in:intrastate,interstate',
+            'notes'                    => 'nullable|string|max:500',
+            'terms'                    => 'nullable|string|max:500',
+            'items'                    => 'required|array|min:1',
+            'items.*.description'      => 'required|string',
+            'items.*.product_id'       => 'nullable|exists:products,id',
+            'items.*.hsn_sac_code'     => 'nullable|string',
+            'items.*.unit'             => 'required|string',
+            'items.*.quantity'         => 'required|numeric|min:0.001',
+            'items.*.price'            => 'required|numeric|min:0',
+            'items.*.gst_rate'         => 'required|numeric|min:0|max:28',
+            'items.*.discount_percent' => 'nullable|numeric|min:0|max:100',
         ]);
 
         $tenant = $request->user()->tenant;
+        $quotation = null;
 
-        DB::transaction(function () use ($validated, $tenant) {
-            $quotationNumber = $tenant->nextQuotationNumber();
-
-            $calculatedItems = collect($validated['items'])->map(function ($item, $index) use ($validated) {
-                $calc = $this->gst->calculateItem(
-                    $item['price'],
-                    $item['quantity'],
-                    $item['gst_rate'],
-                    $validated['supply_type'],
-                    $item['discount_percent'] ?? 0
-                );
+        DB::transaction(function () use ($validated, $tenant, &$quotation) {
+            $quotationNumber  = $tenant->nextQuotationNumber();
+            $calculatedItems  = collect($validated['items'])->map(function ($item, $index) use ($validated) {
+                $calc = $this->gst->calculateItem($item['price'], $item['quantity'], $item['gst_rate'], $validated['supply_type'], $item['discount_percent'] ?? 0);
                 return array_merge($item, $calc, ['sort_order' => $index]);
             });
-
             $totals = $this->gst->calculateInvoiceTotals($calculatedItems->toArray());
 
             $quotation = Quotation::create([
@@ -106,99 +100,92 @@ class QuotationController extends Controller
             }
         });
 
-        return redirect()->route('quotations.index')->with('success', 'Quotation created successfully.');
+        return response()->json(['message' => 'Quotation created successfully.', 'quotation' => $quotation], 201);
     }
 
-    public function show(Request $request, Quotation $quotation)
+    public function show(Request $request, Quotation $quotation): JsonResponse
     {
         $this->authorize($request, $quotation);
         $quotation->load(['customer', 'items.product', 'tenant']);
 
-        return Inertia::render('Quotations/Show', [
+        return response()->json([
             'quotation'     => $quotation,
             'gstGroups'     => $this->gst->groupByGSTRate($quotation->items->map(fn ($i) => $i->toArray())->toArray()),
             'amountInWords' => $this->gst->amountInWords($quotation->total_amount),
         ]);
     }
 
-    public function updateStatus(Request $request, Quotation $quotation)
+    public function updateStatus(Request $request, Quotation $quotation): JsonResponse
     {
         $this->authorize($request, $quotation);
-
         $request->validate(['status' => 'required|in:draft,sent,accepted,rejected']);
         $quotation->update(['status' => $request->status]);
-
-        return back()->with('success', 'Quotation status updated.');
+        return response()->json(['message' => 'Quotation status updated.', 'quotation' => $quotation]);
     }
 
-    public function convert(Request $request, Quotation $quotation)
+    public function convert(Request $request, Quotation $quotation): JsonResponse
     {
         $this->authorize($request, $quotation);
 
         if ($quotation->status === 'converted') {
-            return back()->withErrors(['quotation' => 'Already converted to invoice.']);
+            return response()->json(['errors' => ['quotation' => ['Already converted to invoice.']]], 422);
         }
 
-        $tenant = $request->user()->tenant;
+        $tenant  = $request->user()->tenant;
+        $invoice = null;
 
-        $invoice = DB::transaction(function () use ($quotation, $tenant) {
-            $invoiceNumber = $tenant->nextInvoiceNumber();
-
+        DB::transaction(function () use ($quotation, $tenant, &$invoice) {
             $invoice = Invoice::create([
-                'tenant_id'      => $tenant->id,
-                'customer_id'    => $quotation->customer_id,
-                'invoice_number' => $invoiceNumber,
-                'invoice_date'   => now()->toDateString(),
-                'due_date'       => null,
-                'invoice_type'   => $quotation->invoice_type,
-                'supply_type'    => $quotation->supply_type,
-                'notes'          => $quotation->notes,
-                'terms'          => $quotation->terms,
-                'subtotal'       => $quotation->subtotal,
-                'cgst_amount'    => $quotation->cgst_amount,
-                'sgst_amount'    => $quotation->sgst_amount,
-                'igst_amount'    => $quotation->igst_amount,
-                'discount_amount'=> $quotation->discount_amount,
-                'total_amount'   => $quotation->total_amount,
-                'amount_paid'    => 0,
-                'payment_status' => 'unpaid',
+                'tenant_id'       => $tenant->id,
+                'customer_id'     => $quotation->customer_id,
+                'invoice_number'  => $tenant->nextInvoiceNumber(),
+                'invoice_date'    => now()->toDateString(),
+                'due_date'        => null,
+                'invoice_type'    => $quotation->invoice_type,
+                'supply_type'     => $quotation->supply_type,
+                'notes'           => $quotation->notes,
+                'terms'           => $quotation->terms,
+                'subtotal'        => $quotation->subtotal,
+                'cgst_amount'     => $quotation->cgst_amount,
+                'sgst_amount'     => $quotation->sgst_amount,
+                'igst_amount'     => $quotation->igst_amount,
+                'discount_amount' => $quotation->discount_amount,
+                'total_amount'    => $quotation->total_amount,
+                'amount_paid'     => 0,
+                'payment_status'  => 'unpaid',
             ]);
 
             foreach ($quotation->items as $item) {
                 InvoiceItem::create([
-                    'invoice_id'     => $invoice->id,
-                    'product_id'     => $item->product_id,
-                    'description'    => $item->description,
-                    'hsn_sac_code'   => $item->hsn_sac_code,
-                    'unit'           => $item->unit,
-                    'quantity'       => $item->quantity,
-                    'price'          => $item->price,
+                    'invoice_id'       => $invoice->id,
+                    'product_id'       => $item->product_id,
+                    'description'      => $item->description,
+                    'hsn_sac_code'     => $item->hsn_sac_code,
+                    'unit'             => $item->unit,
+                    'quantity'         => $item->quantity,
+                    'price'            => $item->price,
                     'discount_percent' => $item->discount_percent,
-                    'taxable_amount' => $item->taxable_amount,
-                    'gst_rate'       => $item->gst_rate,
-                    'cgst_rate'      => $item->cgst_rate,
-                    'sgst_rate'      => $item->sgst_rate,
-                    'igst_rate'      => $item->igst_rate,
-                    'cgst_amount'    => $item->cgst_amount,
-                    'sgst_amount'    => $item->sgst_amount,
-                    'igst_amount'    => $item->igst_amount,
-                    'total_amount'   => $item->total_amount,
-                    'sort_order'     => $item->sort_order,
+                    'taxable_amount'   => $item->taxable_amount,
+                    'gst_rate'         => $item->gst_rate,
+                    'cgst_rate'        => $item->cgst_rate,
+                    'sgst_rate'        => $item->sgst_rate,
+                    'igst_rate'        => $item->igst_rate,
+                    'cgst_amount'      => $item->cgst_amount,
+                    'sgst_amount'      => $item->sgst_amount,
+                    'igst_amount'      => $item->igst_amount,
+                    'total_amount'     => $item->total_amount,
+                    'sort_order'       => $item->sort_order,
                 ]);
             }
 
-            $quotation->update([
-                'status'               => 'converted',
-                'converted_invoice_id' => $invoice->id,
-            ]);
-
+            $quotation->update(['status' => 'converted', 'converted_invoice_id' => $invoice->id]);
             $tenant->incrementMonthlyInvoiceCount();
-
-            return $invoice;
         });
 
-        return redirect()->route('invoices.show', $invoice->id)
-            ->with('success', 'Quotation converted to Invoice ' . $invoice->invoice_number . '.');
+        return response()->json([
+            'message'    => 'Quotation converted to Invoice '.$invoice->invoice_number.'.',
+            'invoice_id' => $invoice->id,
+        ]);
     }
 
     public function download(Request $request, Quotation $quotation)
@@ -207,18 +194,17 @@ class QuotationController extends Controller
         $quotation->load(['tenant', 'customer', 'items.product']);
 
         $amountInWords = $this->gst->amountInWords($quotation->total_amount);
-
         $pdf = Pdf::loadView('quotations.pdf', compact('quotation', 'amountInWords'));
         $pdf->setPaper('A4', 'portrait');
 
-        return $pdf->download('Quotation-' . $quotation->quotation_number . '.pdf');
+        return $pdf->download('Quotation-'.$quotation->quotation_number.'.pdf');
     }
 
-    public function destroy(Request $request, Quotation $quotation)
+    public function destroy(Request $request, Quotation $quotation): Response
     {
         $this->authorize($request, $quotation);
         $quotation->delete();
-        return redirect()->route('quotations.index')->with('success', 'Quotation deleted.');
+        return response()->noContent();
     }
 
     private function authorize(Request $request, Quotation $quotation): void

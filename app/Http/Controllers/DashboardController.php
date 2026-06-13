@@ -4,12 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\Invoice;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 
 class DashboardController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $tenant    = $request->user()->tenant;
         $tid       = $tenant->id;
@@ -137,7 +137,7 @@ class DashboardController extends Controller
                 ->sum('igst_amount'),
         ];
 
-        return Inertia::render('Dashboard', [
+        return response()->json([
             'stats' => [
                 'monthly_total'     => $monthlyTotal,
                 'monthly_paid'      => $monthlyPaid,

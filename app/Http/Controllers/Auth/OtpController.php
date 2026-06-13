@@ -5,75 +5,48 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\NotificationService;
-use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Inertia\Inertia;
-use Inertia\Response;
+use Illuminate\Validation\ValidationException;
 
 class OtpController extends Controller
 {
-    public function show(Request $request): Response|RedirectResponse
-    {
-        if (! session('otp_user_id')) {
-            return redirect()->route('login');
-        }
-
-        return Inertia::render('Auth/VerifyOtp', [
-            'email' => $this->maskedEmail($request),
-        ]);
-    }
-
-    public function verify(Request $request): RedirectResponse
+    public function verify(Request $request): JsonResponse
     {
         $request->validate([
-            'otp' => 'required|string|size:6',
+            'user_id' => 'required',
+            'otp'     => 'required|string|size:6',
         ]);
 
-        $userId = session('otp_user_id');
-        if (! $userId) {
-            return redirect()->route('login')->withErrors(['otp' => 'Session expired. Please login again.']);
-        }
-
-        $user = User::find($userId);
+        $user = User::find($request->user_id);
 
         if (! $user || ! $user->verifyOtp($request->otp)) {
-            return back()->withErrors(['otp' => 'Invalid or expired OTP. Please try again.']);
+            throw ValidationException::withMessages([
+                'otp' => ['Invalid or expired OTP. Please try again.'],
+            ]);
         }
 
-        // Clear OTP and log user in
         $user->update(['otp_code' => null, 'otp_expires_at' => null, 'otp_verified' => true]);
-        $request->session()->forget('otp_user_id');
 
-        Auth::login($user);
-        $request->session()->regenerate();
+        $token = $user->createToken('web')->plainTextToken;
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        return response()->json(['token' => $token, 'user' => $user]);
     }
 
-    public function resend(Request $request): RedirectResponse
+    public function resend(Request $request): JsonResponse
     {
-        $userId = session('otp_user_id');
-        if (! $userId) {
-            return redirect()->route('login');
+        $request->validate([
+            'user_id' => 'required',
+        ]);
+
+        $user = User::find($request->user_id);
+
+        if (! $user) {
+            return response()->json(['message' => 'User not found.'], 404);
         }
 
-        $user = User::find($userId);
-        if ($user) {
-            app(NotificationService::class)->sendLoginOtp($user);
-        }
+        app(NotificationService::class)->sendLoginOtp($user);
 
-        return back()->with('status', 'OTP resent successfully.');
-    }
-
-    private function maskedEmail(Request $request): string
-    {
-        $userId = session('otp_user_id');
-        $user = $userId ? User::find($userId) : null;
-        if (! $user) return '';
-
-        [$local, $domain] = explode('@', $user->email);
-        $masked = substr($local, 0, 2) . str_repeat('*', max(0, strlen($local) - 2));
-        return $masked . '@' . $domain;
+        return response()->json(['message' => 'OTP resent successfully.']);
     }
 }

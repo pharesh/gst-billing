@@ -6,21 +6,22 @@ use App\Models\PurchaseInvoice;
 use App\Models\PurchaseInvoiceItem;
 use App\Models\Supplier;
 use App\Services\GSTCalculationService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
 
 class PurchaseController extends Controller
 {
     public function __construct(private GSTCalculationService $gst) {}
 
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $tenant = $request->user()->tenant;
 
         $bills = PurchaseInvoice::with('supplier')
             ->where('tenant_id', $tenant->id)
-            ->when($request->search, fn ($q) => $q->where('bill_number', 'like', "%{$request->search}%")
+            ->when($request->search,    fn ($q) => $q->where('bill_number', 'like', "%{$request->search}%")
                 ->orWhereHas('supplier', fn ($s) => $s->where('name', 'like', "%{$request->search}%")))
             ->when($request->status,    fn ($q) => $q->where('payment_status', $request->status))
             ->when($request->date_from, fn ($q) => $q->where('bill_date', '>=', $request->date_from))
@@ -31,69 +32,63 @@ class PurchaseController extends Controller
 
         $base = PurchaseInvoice::where('tenant_id', $tenant->id);
 
-        // ITC summary for current tenant
         $itcSummary = [
-            'total_purchases'  => (clone $base)->sum('total_amount'),
-            'itc_cgst'         => (clone $base)->where('itc_eligible', true)->sum('cgst_amount'),
-            'itc_sgst'         => (clone $base)->where('itc_eligible', true)->sum('sgst_amount'),
-            'itc_igst'         => (clone $base)->where('itc_eligible', true)->sum('igst_amount'),
-            'outstanding'      => (clone $base)->whereIn('payment_status', ['unpaid', 'partial'])
+            'total_purchases' => (clone $base)->sum('total_amount'),
+            'itc_cgst'        => (clone $base)->where('itc_eligible', true)->sum('cgst_amount'),
+            'itc_sgst'        => (clone $base)->where('itc_eligible', true)->sum('sgst_amount'),
+            'itc_igst'        => (clone $base)->where('itc_eligible', true)->sum('igst_amount'),
+            'outstanding'     => (clone $base)->whereIn('payment_status', ['unpaid', 'partial'])
                 ->get(['total_amount', 'amount_paid'])
                 ->sum(fn ($b) => $b->total_amount - $b->amount_paid),
         ];
         $itcSummary['itc_total'] = $itcSummary['itc_cgst'] + $itcSummary['itc_sgst'] + $itcSummary['itc_igst'];
 
-        return Inertia::render('Purchases/Index', [
+        return response()->json([
             'bills'      => $bills,
             'itcSummary' => $itcSummary,
             'filters'    => $request->only(['search', 'status', 'date_from', 'date_to']),
         ]);
     }
 
-    public function create(Request $request)
+    public function create(Request $request): JsonResponse
     {
         $tenant = $request->user()->tenant;
 
-        return Inertia::render('Purchases/Create', [
+        return response()->json([
             'suppliers' => Supplier::where('tenant_id', $tenant->id)->active()->get(['id', 'name', 'gstin', 'state_code']),
             'tenant'    => $tenant->only(['state_code', 'gstin', 'invoice_prefix']),
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'supplier_id'                => 'required|exists:suppliers,id',
-            'bill_number'                => 'nullable|string|max:100',
-            'bill_date'                  => 'required|date',
-            'due_date'                   => 'nullable|date|after_or_equal:bill_date',
-            'supply_type'                => 'required|in:intrastate,interstate',
-            'itc_eligible'               => 'boolean',
-            'notes'                      => 'nullable|string|max:500',
-            'items'                      => 'required|array|min:1',
-            'items.*.description'        => 'required|string',
-            'items.*.hsn_sac_code'       => 'nullable|string',
-            'items.*.unit'               => 'required|string',
-            'items.*.quantity'           => 'required|numeric|min:0.001',
-            'items.*.price'              => 'required|numeric|min:0',
-            'items.*.gst_rate'           => 'required|numeric|min:0|max:28',
+            'supplier_id'           => 'required|exists:suppliers,id',
+            'bill_number'           => 'nullable|string|max:100',
+            'bill_date'             => 'required|date',
+            'due_date'              => 'nullable|date|after_or_equal:bill_date',
+            'supply_type'           => 'required|in:intrastate,interstate',
+            'itc_eligible'          => 'boolean',
+            'notes'                 => 'nullable|string|max:500',
+            'items'                 => 'required|array|min:1',
+            'items.*.description'   => 'required|string',
+            'items.*.hsn_sac_code'  => 'nullable|string',
+            'items.*.unit'          => 'required|string',
+            'items.*.quantity'      => 'required|numeric|min:0.001',
+            'items.*.price'         => 'required|numeric|min:0',
+            'items.*.gst_rate'      => 'required|numeric|min:0|max:28',
         ]);
 
         $tenant = $request->user()->tenant;
+        $bill   = null;
 
-        DB::transaction(function () use ($validated, $tenant) {
+        DB::transaction(function () use ($validated, $tenant, &$bill) {
             $billNumber = !empty($validated['bill_number'])
                 ? $validated['bill_number']
                 : $tenant->nextPurchaseBillNumber();
 
             $calculatedItems = collect($validated['items'])->map(function ($item, $index) use ($validated) {
-                $calc = $this->gst->calculateItem(
-                    $item['price'],
-                    $item['quantity'],
-                    $item['gst_rate'],
-                    $validated['supply_type'],
-                    0
-                );
+                $calc = $this->gst->calculateItem($item['price'], $item['quantity'], $item['gst_rate'], $validated['supply_type'], 0);
                 return array_merge($item, $calc, ['sort_order' => $index]);
             });
 
@@ -118,22 +113,22 @@ class PurchaseController extends Controller
             }
         });
 
-        return redirect()->route('purchases.index')->with('success', 'Purchase bill recorded successfully.');
+        return response()->json(['message' => 'Purchase bill recorded successfully.', 'purchase' => $bill], 201);
     }
 
-    public function show(Request $request, PurchaseInvoice $purchase)
+    public function show(Request $request, PurchaseInvoice $purchase): JsonResponse
     {
         $this->authorize($request, $purchase);
         $purchase->load(['supplier', 'items', 'tenant']);
 
-        return Inertia::render('Purchases/Show', [
+        return response()->json([
             'purchase'      => $purchase,
             'gstGroups'     => $this->gst->groupByGSTRate($purchase->items->map(fn ($i) => $i->toArray())->toArray()),
             'amountInWords' => $this->gst->amountInWords($purchase->total_amount),
         ]);
     }
 
-    public function markPaid(Request $request, PurchaseInvoice $purchase)
+    public function markPaid(Request $request, PurchaseInvoice $purchase): JsonResponse
     {
         $this->authorize($request, $purchase);
 
@@ -152,14 +147,14 @@ class PurchaseController extends Controller
             'payment_status' => $status,
         ]);
 
-        return back()->with('success', 'Payment recorded.');
+        return response()->json(['message' => 'Payment recorded.', 'purchase' => $purchase->fresh()]);
     }
 
-    public function destroy(Request $request, PurchaseInvoice $purchase)
+    public function destroy(Request $request, PurchaseInvoice $purchase): Response
     {
         $this->authorize($request, $purchase);
         $purchase->delete();
-        return redirect()->route('purchases.index')->with('success', 'Purchase bill deleted.');
+        return response()->noContent();
     }
 
     private function authorize(Request $request, PurchaseInvoice $purchase): void

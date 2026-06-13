@@ -3,19 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Services\GSTRExportService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 
 class GSTReportController extends Controller
 {
     public function __construct(private GSTRExportService $exporter) {}
 
-    public function index(Request $request)
-    {
-        return Inertia::render('Reports/Index');
-    }
-
-    public function aging(Request $request)
+    public function aging(Request $request): JsonResponse
     {
         $tenant = $request->user()->tenant;
 
@@ -26,13 +21,7 @@ class GSTReportController extends Controller
             ->orderBy('due_date')
             ->get(['id', 'invoice_number', 'customer_id', 'due_date', 'total_amount', 'amount_paid']);
 
-        $buckets = [
-            'current' => [],
-            '1_30'    => [],
-            '31_60'   => [],
-            '61_90'   => [],
-            'over_90' => [],
-        ];
+        $buckets = ['current' => [], '1_30' => [], '31_60' => [], '61_90' => [], 'over_90' => []];
 
         foreach ($unpaid as $inv) {
             $daysOverdue = (int) max(0, now()->diffInDays($inv->due_date, false) * -1);
@@ -47,11 +36,11 @@ class GSTReportController extends Controller
                 'balance_due'    => $balance,
             ];
 
-            if ($daysOverdue === 0)      $buckets['current'][] = $row;
-            elseif ($daysOverdue <= 30)  $buckets['1_30'][]    = $row;
-            elseif ($daysOverdue <= 60)  $buckets['31_60'][]   = $row;
-            elseif ($daysOverdue <= 90)  $buckets['61_90'][]   = $row;
-            else                         $buckets['over_90'][] = $row;
+            if ($daysOverdue === 0)     $buckets['current'][] = $row;
+            elseif ($daysOverdue <= 30) $buckets['1_30'][]    = $row;
+            elseif ($daysOverdue <= 60) $buckets['31_60'][]   = $row;
+            elseif ($daysOverdue <= 90) $buckets['61_90'][]   = $row;
+            else                        $buckets['over_90'][] = $row;
         }
 
         $summary = collect($buckets)->map(fn ($rows) => [
@@ -59,18 +48,18 @@ class GSTReportController extends Controller
             'total' => round(collect($rows)->sum('balance_due'), 2),
         ]);
 
-        return Inertia::render('Reports/Aging', [
+        return response()->json([
             'buckets'           => $buckets,
             'summary'           => $summary,
             'total_outstanding' => round($unpaid->sum(fn ($i) => $i->total_amount - $i->amount_paid), 2),
         ]);
     }
 
-    public function gstr1(Request $request)
+    public function gstr1(Request $request): JsonResponse
     {
         $request->validate([
             'month' => 'required|integer|min:1|max:12',
-            'year' => 'required|integer|min:2017|max:2099',
+            'year'  => 'required|integer|min:2017|max:2099',
         ]);
 
         $data = $this->exporter->gstr1(
@@ -79,19 +68,14 @@ class GSTReportController extends Controller
             (int) $request->year
         );
 
-        if ($request->format === 'json') {
-            return response()->json($data)
-                ->header('Content-Disposition', 'attachment; filename="GSTR1_' . $request->month . '_' . $request->year . '.json"');
-        }
-
-        return Inertia::render('Reports/GSTR1', ['data' => $data, 'month' => $request->month, 'year' => $request->year]);
+        return response()->json(['data' => $data, 'month' => $request->month, 'year' => $request->year]);
     }
 
-    public function gstr3b(Request $request)
+    public function gstr3b(Request $request): JsonResponse
     {
         $request->validate([
             'month' => 'required|integer|min:1|max:12',
-            'year' => 'required|integer|min:2017|max:2099',
+            'year'  => 'required|integer|min:2017|max:2099',
         ]);
 
         $data = $this->exporter->gstr3b(
@@ -100,14 +84,14 @@ class GSTReportController extends Controller
             (int) $request->year
         );
 
-        return Inertia::render('Reports/GSTR3B', ['data' => $data, 'month' => $request->month, 'year' => $request->year]);
+        return response()->json(['data' => $data, 'month' => $request->month, 'year' => $request->year]);
     }
 
     public function downloadGSTR1(Request $request)
     {
         $request->validate([
             'month' => 'required|integer|min:1|max:12',
-            'year' => 'required|integer|min:2017|max:2099',
+            'year'  => 'required|integer|min:2017|max:2099',
         ]);
 
         $json = $this->exporter->exportGSTR1Json(
@@ -117,8 +101,8 @@ class GSTReportController extends Controller
         );
 
         return response($json, 200, [
-            'Content-Type' => 'application/json',
-            'Content-Disposition' => 'attachment; filename="GSTR1_' . $request->month . '_' . $request->year . '.json"',
+            'Content-Type'        => 'application/json',
+            'Content-Disposition' => 'attachment; filename="GSTR1_'.$request->month.'_'.$request->year.'.json"',
         ]);
     }
 }

@@ -3,12 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Supplier;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
+use Illuminate\Http\Response;
 
 class SupplierController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
         $suppliers = Supplier::where('tenant_id', $request->user()->tenant_id)
             ->when($request->search, fn ($q) => $q->where('name', 'like', "%{$request->search}%")
@@ -17,13 +18,13 @@ class SupplierController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return Inertia::render('Suppliers/Index', [
+        return response()->json([
             'suppliers' => $suppliers,
             'filters'   => $request->only('search'),
         ]);
     }
 
-    public function store(Request $request)
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'name'          => 'required|string|max:255',
@@ -40,12 +41,12 @@ class SupplierController extends Controller
             'is_active'     => 'boolean',
         ]);
 
-        Supplier::create([...$validated, 'tenant_id' => $request->user()->tenant_id]);
+        $supplier = Supplier::create([...$validated, 'tenant_id' => $request->user()->tenant_id]);
 
-        return back()->with('success', 'Supplier added.');
+        return response()->json(['message' => 'Supplier added.', 'supplier' => $supplier], 201);
     }
 
-    public function update(Request $request, Supplier $supplier)
+    public function update(Request $request, Supplier $supplier): JsonResponse
     {
         abort_unless($supplier->tenant_id === $request->user()->tenant_id, 403);
 
@@ -66,14 +67,13 @@ class SupplierController extends Controller
 
         $supplier->update($validated);
 
-        return back()->with('success', 'Supplier updated.');
+        return response()->json(['message' => 'Supplier updated.', 'supplier' => $supplier]);
     }
 
-    public function destroy(Request $request, Supplier $supplier)
+    public function destroy(Request $request, Supplier $supplier): Response
     {
         abort_unless($supplier->tenant_id === $request->user()->tenant_id, 403);
         $supplier->delete();
-
-        return back()->with('success', 'Supplier deleted.');
+        return response()->noContent();
     }
 }
