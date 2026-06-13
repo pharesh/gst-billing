@@ -87,9 +87,20 @@ class AdminTenantController extends Controller
     {
         $tenant->load(['plan', 'users', 'subscriptions.plan']);
 
+        $owner = $tenant->users->firstWhere('role', 'owner');
+
+        // Append computed fields expected by Show.vue
+        $tenant->owner_email = $owner?->email;
+        $tenant->plan_name   = $tenant->plan?->name ?? 'Free';
+        $tenant->is_active   = ! $tenant->is_suspended;
+        $tenant->usage       = [
+            'invoices'  => $tenant->invoices()->count(),
+            'customers' => $tenant->customers()->count(),
+        ];
+
         return response()->json([
             'tenant' => $tenant,
-            'plans'  => Plan::orderBy('sort_order')->get(),
+            'plans'  => Plan::orderBy('sort_order')->get(['id', 'name', 'slug']),
             'stats'  => [
                 'total_revenue'    => $tenant->payments()->sum('amount'),
                 'invoice_count'    => $tenant->invoices()->count(),
@@ -155,8 +166,9 @@ class AdminTenantController extends Controller
 
     public function toggleSuspend(Tenant $tenant): JsonResponse
     {
-        $tenant->update(['is_suspended' => ! $tenant->is_suspended]);
-        $status = $tenant->is_suspended ? 'suspended' : 'reactivated';
+        $newValue = ! $tenant->is_suspended;
+        $tenant->update(['is_suspended' => $newValue]);
+        $status = $newValue ? 'suspended' : 'reactivated';
         return response()->json(['message' => "Tenant {$status} successfully."]);
     }
 

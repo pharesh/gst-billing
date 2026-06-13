@@ -59,6 +59,10 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::get('/invoices',                                  [InvoiceController::class, 'index']);
     Route::get('/invoices/create',                           [InvoiceController::class, 'create']);
     Route::post('/invoices', [InvoiceController::class, 'store'])->middleware('plan.limit:invoice');
+    // Static segment routes must be defined BEFORE /{invoice} wildcard routes
+    Route::get('/invoices-export',                           [InvoiceController::class, 'export']);
+    Route::post('/invoices/bulk-download',                   [InvoiceController::class, 'bulkDownload']);
+    Route::post('/invoices/bulk-reminder',                   [InvoiceController::class, 'bulkReminder']);
     Route::get('/invoices/{invoice}',                        [InvoiceController::class, 'show']);
     Route::get('/invoices/{invoice}/edit',                   [InvoiceController::class, 'edit']);
     Route::patch('/invoices/{invoice}',                      [InvoiceController::class, 'update']);
@@ -71,11 +75,9 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     Route::post('/invoices/{invoice}/payment-link/sync',     [InvoiceController::class, 'syncPaymentLink']);
     Route::post('/invoices/{invoice}/irn',                   [InvoiceController::class, 'generateIRN']);
     Route::post('/invoices/{invoice}/irn/cancel',            [InvoiceController::class, 'cancelIRN']);
-    Route::get('/invoices-export',                           [InvoiceController::class, 'export']);
-    Route::post('/invoices/bulk-download',                   [InvoiceController::class, 'bulkDownload']);
-    Route::post('/invoices/bulk-reminder',                   [InvoiceController::class, 'bulkReminder']);
 
     // Payments
+    Route::get('/payments',                     [PaymentController::class, 'index']);
     Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store']);
     Route::delete('/payments/{payment}',        [PaymentController::class, 'destroy']);
     Route::get('/payments-export',              [PaymentController::class, 'export']);
@@ -83,21 +85,24 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
     // Customers
     Route::get('/customers',                           [CustomerController::class, 'index']);
     Route::post('/customers', [CustomerController::class, 'store'])->middleware('plan.limit:customer');
+    Route::get('/customers/{customer}',                [CustomerController::class, 'show']);
     Route::patch('/customers/{customer}',              [CustomerController::class, 'update']);
     Route::delete('/customers/{customer}',             [CustomerController::class, 'destroy']);
     Route::get('/customers/{customer}/statement',      [CustomerController::class, 'statement']);
     Route::get('/customers-export',                    [CustomerController::class, 'export']);
 
     // Products
-    Route::get('/products',           [ProductController::class, 'index']);
+    Route::get('/products',              [ProductController::class, 'index']);
     Route::post('/products', [ProductController::class, 'store'])->middleware('plan.limit:product');
-    Route::patch('/products/{product}', [ProductController::class, 'update']);
+    Route::get('/products/{product}',    [ProductController::class, 'show']);
+    Route::patch('/products/{product}',  [ProductController::class, 'update']);
     Route::delete('/products/{product}', [ProductController::class, 'destroy']);
 
     // Suppliers
-    Route::get('/suppliers',              [SupplierController::class, 'index']);
-    Route::post('/suppliers',             [SupplierController::class, 'store']);
-    Route::patch('/suppliers/{supplier}', [SupplierController::class, 'update']);
+    Route::get('/suppliers',               [SupplierController::class, 'index']);
+    Route::post('/suppliers',              [SupplierController::class, 'store']);
+    Route::get('/suppliers/{supplier}',    [SupplierController::class, 'show']);
+    Route::patch('/suppliers/{supplier}',  [SupplierController::class, 'update']);
     Route::delete('/suppliers/{supplier}', [SupplierController::class, 'destroy']);
 
     // Quotations
@@ -153,7 +158,8 @@ Route::middleware(['auth:sanctum', 'tenant'])->group(function () {
 
 // ─── Admin Routes ──────────────────────────────────────────────────────────────
 Route::middleware(['auth:sanctum', 'superadmin'])->prefix('admin')->group(function () {
-    Route::get('/',                                           [AdminDashboardController::class, 'index']);
+    Route::get('/',          [AdminDashboardController::class, 'index']);
+    Route::get('/dashboard', [AdminDashboardController::class, 'index']);
     Route::get('/tenants',                                    [AdminTenantController::class, 'index']);
     Route::post('/tenants',                                   [AdminTenantController::class, 'store']);
     Route::get('/tenants/{tenant}',                           [AdminTenantController::class, 'show']);

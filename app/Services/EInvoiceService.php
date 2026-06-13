@@ -22,10 +22,10 @@ class EInvoiceService
             ? 'https://einv-apisandbox.nic.in'
             : 'https://api.invoice-registration.nic.in';
 
-        $this->clientId     = config('services.einvoice.client_id', '');
-        $this->clientSecret = config('services.einvoice.client_secret', '');
-        $this->username     = config('services.einvoice.username', '');
-        $this->password     = config('services.einvoice.password', '');
+        $this->clientId     = config('services.einvoice.client_id') ?? '';
+        $this->clientSecret = config('services.einvoice.client_secret') ?? '';
+        $this->username     = config('services.einvoice.username') ?? '';
+        $this->password     = config('services.einvoice.password') ?? '';
     }
 
     public function generateIRN(Invoice $invoice): array

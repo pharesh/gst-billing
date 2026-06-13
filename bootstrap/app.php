@@ -6,6 +6,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
+        web: __DIR__.'/../routes/web.php',
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
@@ -23,5 +24,13 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (\MongoDB\Driver\Exception\AuthenticationException $e, $request) {
+            return response()->json(['message' => 'Database authentication error. Check server configuration.'], 503);
+        });
+        $exceptions->render(function (\MongoDB\Driver\Exception\ConnectionTimeoutException $e, $request) {
+            return response()->json(['message' => 'Database connection timeout. Please try again.'], 503);
+        });
+        $exceptions->render(function (\MongoDB\Driver\Exception\RuntimeException $e, $request) {
+            return response()->json(['message' => 'Database error. Please try again.'], 503);
+        });
     })->create();

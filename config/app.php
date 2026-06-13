@@ -15,6 +15,8 @@ return [
 
     'name' => env('APP_NAME', 'Laravel'),
 
+    'otp_enabled' => env('OTP_ENABLED', true),
+
     /*
     |--------------------------------------------------------------------------
     | Application Environment

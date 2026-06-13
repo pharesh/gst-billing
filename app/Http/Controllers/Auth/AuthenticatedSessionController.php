@@ -43,12 +43,12 @@ class AuthenticatedSessionController extends Controller
         RateLimiter::clear($throttleKey);
 
         // If OTP not yet verified, send OTP and require verification
-        if (! $user->otp_verified) {
+        if (config('app.otp_enabled', true) && ! $user->otp_verified) {
             app(NotificationService::class)->sendLoginOtp($user);
             return response()->json([
                 'requires_otp' => true,
-                'email'        => $this->maskedEmail($user->email),
                 'user_id'      => $user->id,
+                'email'        => $user->email,
             ]);
         }
 

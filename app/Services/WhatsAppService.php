@@ -16,8 +16,8 @@ class WhatsAppService
     public function __construct()
     {
         $this->apiUrl = 'https://graph.facebook.com/v18.0';
-        $this->token = config('services.whatsapp.token', '');
-        $this->phoneNumberId = config('services.whatsapp.phone_number_id', '');
+        $this->token = config('services.whatsapp.token') ?? '';
+        $this->phoneNumberId = config('services.whatsapp.phone_number_id') ?? '';
     }
 
     public function isConfigured(): bool
